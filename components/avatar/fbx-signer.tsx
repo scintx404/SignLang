@@ -3,7 +3,7 @@
 /**
  * Rigged FBX signer.
  *
- * Drives the imported rigged model (public/models/SignerModelRigged.fbx) from
+ * Drives the imported rigged model (public/models/SignerModelRigged7.fbx) from
  * the SAME PosePlayer output that fed the old procedural avatar. The abstract
  * per-frame hand targets and finger curls are mapped onto the model's real
  * skeleton:
@@ -169,7 +169,7 @@ function applyFingers(rig: ArmRig, shape: HandShape) {
 
 export function FBXSigner({
   playerRef,
-  url = "/models/SignerModelRigged.fbx",
+  url = "/models/SignerModelRigged7.fbx",
 }: {
   playerRef: React.MutableRefObject<PosePlayer>
   url?: string
@@ -338,4 +338,4 @@ export function FBXSigner({
   return <primitive object={model} />
 }
 
-useFBX.preload("/models/SignerModelRigged.fbx")
+useFBX.preload("/models/SignerModelRigged7.fbx")

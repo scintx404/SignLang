@@ -9,7 +9,7 @@ import { FBXSigner } from "./fbx-signer"
 import { PosePlayer } from "@/lib/sign/pose-player"
 
 // Default rigged signer shipped with the app.
-const DEFAULT_MODEL_URL = "/models/SignerModelRigged.fbx"
+const DEFAULT_MODEL_URL = "/models/SignerModelRigged7.fbx"
 
 /**
  * Catches errors thrown while loading/parsing the rigged model (e.g. a missing
