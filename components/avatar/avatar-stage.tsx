@@ -5,8 +5,11 @@ import { Canvas } from "@react-three/fiber"
 import { OrbitControls, ContactShadows } from "@react-three/drei"
 import * as THREE from "three"
 import { SignerAvatar } from "./signer-avatar"
-import { GLBSigner } from "./glb-signer"
+import { FBXSigner } from "./fbx-signer"
 import { PosePlayer } from "@/lib/sign/pose-player"
+
+// Default rigged signer shipped with the app.
+const DEFAULT_MODEL_URL = "/models/SignerModelRigged.fbx"
 
 function ModelWithFallback({
   playerRef,
@@ -31,7 +34,7 @@ function ModelWithFallback({
     }
   }, [url, onError])
 
-  return <GLBSigner playerRef={playerRef} url={url} />
+  return <FBXSigner playerRef={playerRef} url={url} />
 }
 
 export function AvatarStage({
