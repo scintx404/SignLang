@@ -180,15 +180,37 @@ export function FBXSigner({
   const zShiftRef = useRef(0)
 
   useEffect(() => {
-    // The shipped FBX (a Tripo export) references an external "base_color"
-    // texture that isn't bundled with the model, so its baked material resolves
-    // to a black map. Swap in a clean, uniform mannequin material so the figure
-    // is clearly lit and the hand/finger shapes read well while signing.
+    // The FBX ships a single UV-mapped material whose color comes from an
+    // external "baseColor.jpg" texture (referenced by relative path, NOT
+    // embedded in the file). We build one shared MeshStandardMaterial that
+    // keeps the model's UVs and try to load that texture from
+    // `/models/baseColor.jpg`. If the texture is present it shows the real
+    // model colors; if it's missing we fall back to a neutral skin tone so the
+    // figure is still clearly lit instead of rendering black.
     const skin = new THREE.MeshStandardMaterial({
       color: "#c8a488",
       roughness: 0.62,
       metalness: 0.0,
     })
+
+    new THREE.TextureLoader().load(
+      "/models/baseColor.jpg",
+      (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace
+        // FBX exports keep the default top-up texture orientation (unlike
+        // glTF), so we leave tex.flipY at its default (true) to match the UVs.
+        tex.anisotropy = 8
+        skin.map = tex
+        skin.color.set("#ffffff") // let the texture drive the color unmodulated
+        skin.needsUpdate = true
+        console.log("[v0] fbx rig: baseColor.jpg loaded, showing model textures")
+      },
+      undefined,
+      () => {
+        console.log("[v0] fbx rig: /models/baseColor.jpg not found — using skin fallback color")
+      },
+    )
+
     model.traverse((o) => {
       const mesh = o as THREE.SkinnedMesh
       if (mesh.isMesh || mesh.isSkinnedMesh) {
