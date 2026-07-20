@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- skill:chrome -->
+<style>
+/* Credit line — bottom-right */
+.design-ui-credit {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  font: 11px/1 system-ui, sans-serif;
+  color: rgba(128,128,128,0.5);
+  pointer-events: none;
+  z-index: 2147483647;
+  transition: opacity 0.4s ease;
+  user-select: none;
+  letter-spacing: 0.02em;
+}
+
+/* Hide chrome on touch devices */
+@media (hover: none) {
+  .design-ui-credit { display: none; }
+}
+
+/* Print fixes */
+@media print {
+  * {
+    transition: none !important;
+    animation: none !important;
+    box-shadow: none !important;
+  }
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .design-ui-credit { display: none !important; }
+}
+
+</style>
+<script>
+(function () {
+    // Design-ui pages are single compositions, so the whole body is editable.
+    function markEditable() {
+        document.body.classList.add('artifact-editable');
+    }
+
+    // Credit badge with idle-fade. Hover devices only.
+    function initChromeUI() {
+        if (!matchMedia('(hover: hover)').matches) return;
+
+        var credit = document.createElement('div');
+        credit.className = 'design-ui-credit';
+        credit.setAttribute('aria-hidden', 'true');
+        credit.innerHTML = '\u{1F49C} by ClickUp Brain';
+        document.body.appendChild(credit);
+
+        var timer = null;
+        var fade = function (out) { credit.style.opacity = out ? '0' : ''; };
+        fade(true);
+        var show = function () {
+            fade(false);
+            clearTimeout(timer);
+            timer = setTimeout(function () { fade(true); }, 3000);
+        };
+        document.addEventListener('mousemove', show);
+        show();
+    }
+
+    function init() {
+        markEditable();
+        initChromeUI();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+
+</script>
+<!-- /skill:chrome -->
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fluent — Live Sign Language Translation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* warm paper neutrals, tinted toward orange */
+    --paper:      oklch(97.6% 0.007 70);
+    --surface:    oklch(99.2% 0.004 70);
+    --surface-2:  oklch(96.2% 0.008 70);
+    --ink:        oklch(23% 0.02 55);
+    --ink-soft:   oklch(44% 0.02 58);
+    --ink-faint:  oklch(60% 0.015 60);
+    --line:       oklch(90.5% 0.009 68);
+    --line-soft:  oklch(93.5% 0.007 68);
+
+    /* mode accents: coral = signing-in, violet = voice-in */
+    --coral:      oklch(63% 0.204 28);
+    --coral-deep: oklch(52% 0.19 28);
+    --coral-wash: oklch(94% 0.045 40);
+    --violet:     oklch(56% 0.19 300);
+    --violet-wash:oklch(94% 0.04 300);
+
+    /* dark camera viewport */
+    --stage:      oklch(21% 0.028 285);
+    --stage-2:    oklch(26% 0.03 285);
+    --stage-line: oklch(38% 0.03 285);
+    --stage-txt:  oklch(88% 0.02 285);
+
+    --ok:         oklch(64% 0.15 150);
+
+    --r-sm: 8px; --r-md: 14px; --r-lg: 22px;
+    --shadow: 0 1px 2px oklch(30% 0.02 60 / 0.04), 0 8px 26px oklch(30% 0.02 60 / 0.06);
+    --shadow-lg: 0 2px 4px oklch(30% 0.02 60 / 0.05), 0 24px 60px oklch(30% 0.02 60 / 0.12);
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-display: "Bricolage Grotesque", var(--font-ui);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    font-family: var(--font-ui);
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.55;
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.05; letter-spacing: -0.02em; }
+
+  .wrap { max-width: 1220px; margin: 0 auto; padding: clamp(18px, 3vw, 34px); }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .mark {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: var(--ink); color: var(--paper);
+    display: grid; place-items: center; flex: none;
+    box-shadow: var(--shadow);
+  }
+  .mark svg { width: 22px; height: 22px; }
+  .brand-txt .name { font-family: var(--font-display); font-weight: 700; font-size: 1.32rem; letter-spacing: -0.03em; line-height: 1; }
+  .brand-txt .tag { font-size: 0.78rem; color: var(--ink-faint); margin-top: 2px; }
+
+  .topbar-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+  .lang-picker {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 999px; padding: 7px 14px 7px 12px;
+    font-size: 0.85rem; font-weight: 500; color: var(--ink-soft);
+    box-shadow: var(--shadow);
+  }
+  .lang-picker b { color: var(--ink); font-weight: 600; }
+  .lang-picker .swap { color: var(--ink-faint); font-size: 1.05rem; line-height: 1; }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 0.8rem; font-weight: 600; letter-spacing: 0.01em;
+    padding: 8px 14px; border-radius: 999px;
+    background: var(--surface-2); color: var(--ink-soft);
+    border: 1px solid var(--line);
+  }
+  .status-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); }
+  .status-pill.is-live { background: var(--coral-wash); color: var(--coral-deep); border-color: transparent; }
+  .status-pill.is-live .dot { background: var(--coral); animation: pulse 1.6s var(--ease) infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: 0.35; transform: scale(0.7);} }
+
+  /* ---------- studio grid ---------- */
+  .studio {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(340px, 1fr);
+    gap: 22px;
+    margin-top: 26px;
+    align-items: start;
+  }
+  @media (max-width: 940px) { .studio { grid-template-columns: 1fr; } }
+
+  /* ---------- stage / viewport ---------- */
+  .stage { display: flex; flex-direction: column; gap: 16px; }
+
+  .viewport {
+    position: relative;
+    background: var(--stage);
+    border-radius: var(--r-lg);
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    isolation: isolate;
+  }
+  .viewport canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* scanning grid backdrop */
+  .grid-bg {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(oklch(100% 0 0 / 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(100% 0 0 / 0.035) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse 90% 90% at 50% 45%, black 40%, transparent 92%);
+  }
+
+  .hud { position: absolute; inset: 0; padding: 16px; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+  .hud-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+
+  .rec {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--stage-txt);
+    background: oklch(18% 0.02 285 / 0.55);
+    padding: 7px 12px; border-radius: 999px;
+    backdrop-filter: blur(6px);
+  }
+  .rec .rdot { width: 8px; height: 8px; border-radius: 50%; background: var(--coral); animation: pulse 1.4s var(--ease) infinite; }
+  .cam-meta { display: flex; gap: 8px; }
+  .chip-hud {
+    font-size: 0.68rem; font-weight: 600; letter-spacing: 0.05em;
+    color: var(--stage-txt);
+    background: oklch(18% 0.02 285 / 0.55);
+    padding: 6px 10px; border-radius: 8px;
+    backdrop-filter: blur(6px);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .detect {
+    align-self: flex-start;
+    background: oklch(18% 0.02 285 / 0.62);
+    backdrop-filter: blur(8px);
+    border-radius: var(--r-md);
+    padding: 12px 16px;
+    min-width: 210px;
+    border: 1px solid oklch(100% 0 0 / 0.06);
+    transition: opacity 0.4s var(--ease);
+  }
+  .detect .label { font-size: 0.68rem; letter-spacing: 0.09em; text-transform: uppercase; color: oklch(72% 0.02 285); }
+  .detect .gloss {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: 1.5rem; letter-spacing: -0.01em; color: #fff;
+    margin: 2px 0 10px; line-height: 1;
+    min-height: 1.5rem;
+  }
+  .conf { display: flex; align-items: center; gap: 9px; }
+  .conf-track { flex: 1; height: 5px; border-radius: 999px; background: oklch(100% 0 0 / 0.14); overflow: hidden; }
+  .conf-fill { height: 100%; width: 0%; border-radius: 999px; background: var(--coral); transition: width 0.5s var(--ease); }
+  .conf-val { font-size: 0.76rem; font-weight: 600; color: var(--stage-txt); font-variant-numeric: tabular-nums; min-width: 38px; text-align: right; }
+
+  body[data-mode="voice"] .conf-fill { background: var(--violet); }
+  body[data-mode="voice"] .rec .rdot { background: var(--violet); }
+
+  /* waveform (voice mode) */
+  .wave { position: absolute; left: 16px; right: 16px; bottom: 16px; height: 46px; display: none; align-items: flex-end; gap: 3px; pointer-events: none; }
+  body[data-mode="voice"][data-running="true"] .wave { display: flex; }
+  .wave span {
+    flex: 1; min-width: 2px; border-radius: 999px;
+    background: var(--violet);
+    height: 10%; transform-origin: bottom;
+    transition: transform 0.09s linear;
+    opacity: 0.85;
+  }
+
+  /* idle + connecting overlays */
+  .overlay {
+    position: absolute; inset: 0; z-index: 5;
+    display: grid; place-items: center; text-align: center;
+    background: radial-gradient(ellipse 120% 100% at 50% 30%, oklch(30% 0.03 285), var(--stage));
+    padding: 24px;
+  }
+  .overlay-inner { max-width: 360px; }
+  .overlay .glyph {
+    width: 66px; height: 66px; margin: 0 auto 18px;
+    display: grid; place-items: center; border-radius: 20px;
+    background: oklch(100% 0 0 / 0.06); color: #fff;
+    border: 1px solid oklch(100% 0 0 / 0.09);
+  }
+  .overlay .glyph svg { width: 34px; height: 34px; }
+  .overlay h2 { color: #fff; font-size: 1.5rem; margin-bottom: 8px; }
+  .overlay p { color: oklch(74% 0.02 285); font-size: 0.92rem; margin-bottom: 22px; }
+
+  .btn-start {
+    font-family: var(--font-ui); font-size: 0.95rem; font-weight: 600;
+    color: #fff; background: var(--coral);
+    border: none; border-radius: 999px; padding: 13px 28px;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 9px;
+    box-shadow: 0 8px 22px oklch(63% 0.2 28 / 0.4);
+    transition: transform 0.18s var(--ease), background 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  }
+  .btn-start:hover { transform: translateY(-2px); background: var(--coral-deep); box-shadow: 0 12px 30px oklch(63% 0.2 28 / 0.5); }
+  .btn-start:active { transform: translateY(0); }
+  .btn-start svg { width: 18px; height: 18px; }
+
+  .overlay[data-state="connecting"] .glyph { animation: spin 1.1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .dots-load::after { content: ""; animation: dots 1.4s steps(4, end) infinite; }
+  @keyframes dots { 0% { content: "";} 25%{content:".";} 50%{content:"..";} 75%{content:"...";} }
+
+  /* ---------- controls ---------- */
+  .controls {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-md); padding: 12px 14px;
+    box-shadow: var(--shadow);
+  }
+  .seg {
+    display: inline-flex; background: var(--surface-2);
+    border-radius: 10px; padding: 4px; gap: 3px;
+    border: 1px solid var(--line-soft);
+  }
+  .seg button {
+    font-family: var(--font-ui); font-size: 0.85rem; font-weight: 600;
+    color: var(--ink-soft); background: transparent; border: none;
+    padding: 8px 15px; border-radius: 7px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: color 0.2s var(--ease);
+  }
+  .seg button svg { width: 15px; height: 15px; }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  body[data-mode="sign"] .seg button.m-sign[aria-pressed="true"] { color: var(--coral-deep); }
+  body[data-mode="voice"] .seg button.m-voice[aria-pressed="true"] { color: var(--violet); }
+
+  .ctrl-spacer { flex: 1; }
+  .icon-btn {
+    width: 42px; height: 42px; border-radius: 11px;
+    display: grid; place-items: center; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--line-soft);
+    color: var(--ink-soft);
+    transition: background 0.18s var(--ease), color 0.18s var(--ease), transform 0.18s var(--ease);
+  }
+  .icon-btn:hover { transform: translateY(-1px); color: var(--ink); }
+  .icon-btn svg { width: 19px; height: 19px; }
+  .icon-btn.off { color: var(--coral-deep); background: var(--coral-wash); border-color: transparent; }
+
+  .btn-end {
+    font-family: var(--font-ui); font-size: 0.88rem; font-weight: 600;
+    color: var(--ink); background: var(--surface-2);
+    border: 1px solid var(--line); border-radius: 11px;
+    padding: 10px 18px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: background 0.18s var(--ease), color 0.18s var(--ease);
+  }
+  .btn-end:hover { background: var(--coral); color: #fff; border-color: transparent; }
+  .btn-end svg { width: 16px; height: 16px; }
+  .btn-end[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+  /* ---------- stream panel ---------- */
+  .stream {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--r-lg); box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+    min-height: 520px;
+    overflow: hidden;
+  }
+  .stream-head {
+    padding: 18px 20px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .stream-head h2 { font-size: 1.02rem; letter-spacing: -0.01em; }
+  .dir {
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.03em;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 11px; border-radius: 999px;
+    background: var(--coral-wash); color: var(--coral-deep);
+  }
+  body[data-mode="voice"] .dir { background: var(--violet-wash); color: var(--violet); }
+  .dir svg { width: 13px; height: 13px; }
+
+  /* live caption */
+  .live-cap {
+    padding: 22px 20px;
+    border-bottom: 1px solid var(--line-soft);
+    min-height: 118px;
+    display: flex; flex-direction: column; justify-content: center;
+    background: var(--surface-2);
+  }
+  .live-cap .who {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-faint); margin-bottom: 8px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .live-cap .who .tag-in { padding: 2px 7px; border-radius: 5px; background: var(--coral-wash); color: var(--coral-deep); letter-spacing: 0.05em; }
+  body[data-mode="voice"] .live-cap .who .tag-in { background: var(--violet-wash); color: var(--violet); }
+  .live-text {
+    font-family: var(--font-display); font-weight: 500;
+    font-size: clamp(1.28rem, 2.4vw, 1.65rem); line-height: 1.25;
+    color: var(--ink); letter-spacing: -0.015em;
+    text-wrap: pretty;
+  }
+  .live-text .cursor {
+    display: inline-block; width: 3px; height: 1.1em; vertical-align: -0.16em;
+    background: var(--coral); margin-left: 3px; border-radius: 2px;
+    animation: blink 1s steps(2) infinite;
+  }
+  body[data-mode="voice"] .live-text .cursor { background: var(--violet); }
+  @keyframes blink { 50% { opacity: 0; } }
+  .live-idle { color: var(--ink-faint); font-family: var(--font-ui); font-weight: 400; font-size: 1rem; letter-spacing: 0; }
+
+  /* glosses row for voice->sign */
+  .gloss-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+  .gloss-chip {
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em;
+    padding: 5px 10px; border-radius: 7px;
+    background: var(--surface); border: 1px solid var(--line);
+    color: var(--ink-soft); opacity: 0.4;
+    transition: opacity 0.3s var(--ease), color 0.3s var(--ease), background 0.3s var(--ease), transform 0.3s var(--ease);
+    transform: translateY(4px);
+  }
+  .gloss-chip.on { opacity: 1; transform: translateY(0); background: var(--violet-wash); color: var(--violet); border-color: transparent; }
+
+  /* transcript */
+  .transcript {
+    flex: 1; overflow-y: auto; padding: 8px 20px 20px;
+    display: flex; flex-direction: column; gap: 2px;
+    scrollbar-width: thin;
+  }
+  .t-empty {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; color: var(--ink-faint); gap: 10px; padding: 30px;
+  }
+  .t-empty svg { width: 30px; height: 30px; opacity: 0.5; }
+  .t-empty p { font-size: 0.9rem; max-width: 26ch; }
+
+  .t-line {
+    padding: 14px 0;
+    border-top: 1px solid var(--line-soft);
+    animation: rise 0.5s var(--ease) both;
+  }
+  .t-line:first-child { border-top: none; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .t-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .t-who {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 5px;
+  }
+  .t-who.signer { background: var(--coral-wash); color: var(--coral-deep); }
+  .t-who.voice { background: var(--violet-wash); color: var(--violet); }
+  .t-time { font-size: 0.72rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .t-conf { margin-left: auto; font-size: 0.72rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
+  .t-conf svg { width: 12px; height: 12px; }
+  .t-text { font-size: 0.98rem; color: var(--ink); line-height: 1.5; text-wrap: pretty; }
+  .t-text .play {
+    display: inline-flex; vertical-align: -0.15em; margin-right: 6px;
+    color: var(--coral); cursor: pointer;
+  }
+  .t-text .play svg { width: 15px; height: 15px; }
+  .t-gloss { font-size: 0.74rem; color: var(--ink-faint); letter-spacing: 0.04em; margin-top: 5px; }
+
+  /* ---------- footer strip ---------- */
+  .strip {
+    margin-top: 22px; padding-top: 20px;
+    border-top: 1px solid var(--line);
+    display: flex; gap: clamp(20px, 5vw, 60px); flex-wrap: wrap;
+    align-items: baseline;
+  }
+  .stat .n { font-family: var(--font-display); font-weight: 700; font-size: 1.55rem; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stat .k { font-size: 0.8rem; color: var(--ink-faint); margin-top: 1px; }
+  .strip-note { margin-left: auto; font-size: 0.8rem; color: var(--ink-faint); max-width: 34ch; align-self: center; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body data-mode="sign" data-running="false">
+  <div class="wrap">
+
+    <!-- top bar -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12"/>
+            <path d="M11 12V4.5a1.5 1.5 0 0 1 3 0V12"/>
+            <path d="M14 12V6a1.5 1.5 0 0 1 3 0v6"/>
+            <path d="M17 12v-1.5a1.5 1.5 0 0 1 3 0V16a6 6 0 0 1-6 6h-2a7 7 0 0 1-6.3-3.9L3.5 15a1.6 1.6 0 0 1 2.8-1.6L8 15.5"/>
+          </svg>
+        </div>
+        <div class="brand-txt">
+          <div class="name">Fluent</div>
+          <div class="tag">Real-time sign ↔ speech interpreter</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="lang-picker">
+          <b>ASL</b><span class="swap">⇄</span><b>English</b>
+        </div>
+        <div class="status-pill" id="statusPill"><span class="dot"></span><span id="statusTxt">Camera idle</span></div>
+      </div>
+    </header>
+
+    <!-- studio -->
+    <main class="studio">
+
+      <!-- stage -->
+      <section class="stage">
+        <div class="viewport" id="viewport">
+          <div class="grid-bg"></div>
+          <canvas id="handCanvas"></canvas>
+
+          <div class="wave" id="wave" aria-hidden="true"></div>
+
+          <div class="hud">
+            <div class="hud-row">
+              <span class="rec"><span class="rdot"></span> Live</span>
+              <div class="cam-meta">
+                <span class="chip-hud">720p · 30fps</span>
+                <span class="chip-hud" id="latency">38 ms</span>
+              </div>
+            </div>
+            <div class="detect" id="detect">
+              <div class="label" id="detectLabel">Recognizing sign</div>
+              <div class="gloss" id="detectGloss">—</div>
+              <div class="conf">
+                <div class="conf-track"><div class="conf-fill" id="confFill"></div></div>
+                <div class="conf-val" id="confVal">0%</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- idle overlay -->
+          <div class="overlay" id="overlay" data-state="idle">
+            <div class="overlay-inner">
+              <div class="glyph" id="overlayGlyph">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="5" width="14" height="14" rx="3"/><path d="m22 8-6 4 6 4V8z"/>
+                </svg>
+              </div>
+              <h2 id="overlayTitle">Start a live session</h2>
+              <p id="overlayText">Point a camera at the signer. Fluent tracks 21 hand landmarks and translates in real time. Nothing is recorded.</p>
+              <button class="btn-start" id="startBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 3 14 9-14 9V3z"/></svg>
+                Start session
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- controls -->
+        <div class="controls">
+          <div class="seg" role="group" aria-label="Translation direction">
+            <button class="m-sign" id="modeSign" aria-pressed="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+              Sign → Speech
+            </button>
+            <button class="m-voice" id="modeVoice" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+              Speech → Sign
+            </button>
+          </div>
+          <div class="ctrl-spacer"></div>
+          <button class="icon-btn" id="camBtn" title="Toggle camera" aria-label="Toggle camera">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+          </button>
+          <button class="icon-btn" id="micBtn" title="Toggle microphone" aria-label="Toggle microphone">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+          </button>
+          <button class="btn-end" id="endBtn" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+            End
+          </button>
+        </div>
+      </section>
+
+      <!-- stream panel -->
+      <aside class="stream">
+        <div class="stream-head">
+          <h2>Translation</h2>
+          <span class="dir" id="dir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            <span id="dirTxt">ASL to spoken English</span>
+          </span>
+        </div>
+
+        <div class="live-cap">
+          <div class="who"><span class="tag-in" id="liveTag">Signer</span> <span id="liveSub">interpreting live</span></div>
+          <div class="live-text" id="liveText"><span class="live-idle">Waiting for input…</span></div>
+          <div class="gloss-row" id="glossRow" style="display:none;"></div>
+        </div>
+
+        <div class="transcript" id="transcript">
+          <div class="t-empty" id="tEmpty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+            <p>Your translated conversation will appear here, line by line.</p>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- stat strip -->
+    <footer class="strip">
+      <div class="stat"><div class="n" id="sWords">0</div><div class="k">words translated</div></div>
+      <div class="stat"><div class="n" id="sSigns">0</div><div class="k">signs recognized</div></div>
+      <div class="stat"><div class="n">42<span style="font-size:1rem"> ms</span></div><div class="k">avg latency</div></div>
+      <div class="stat"><div class="n">31</div><div class="k">sign languages</div></div>
+      <p class="strip-note">On-device hand tracking. Video never leaves the browser: only the translated text does.</p>
+    </footer>
+  </div>
+
+<script>
+(() => {
+  const body = document.body;
+  const canvas = document.getElementById('handCanvas');
+  const ctx = canvas.getContext('2d');
+
+  const el = {
+    overlay: document.getElementById('overlay'),
+    overlayTitle: document.getElementById('overlayTitle'),
+    overlayText: document.getElementById('overlayText'),
+    startBtn: document.getElementById('startBtn'),
+    endBtn: document.getElementById('endBtn'),
+    modeSign: document.getElementById('modeSign'),
+    modeVoice: document.getElementById('modeVoice'),
+    statusPill: document.getElementById('statusPill'),
+    statusTxt: document.getElementById('statusTxt'),
+    detectGloss: document.getElementById('detectGloss'),
+    detectLabel: document.getElementById('detectLabel'),
+    confFill: document.getElementById('confFill'),
+    confVal: document.getElementById('confVal'),
+    liveText: document.getElementById('liveText'),
+    liveTag: document.getElementById('liveTag'),
+    liveSub: document.getElementById('liveSub'),
+    glossRow: document.getElementById('glossRow'),
+    transcript: document.getElementById('transcript'),
+    tEmpty: document.getElementById('tEmpty'),
+    dirTxt: document.getElementById('dirTxt'),
+    wave: document.getElementById('wave'),
+    latency: document.getElementById('latency'),
+    sWords: document.getElementById('sWords'),
+    sSigns: document.getElementById('sSigns'),
+  };
+
+  let mode = 'sign';
+  let running = false;
+  let sessionSeq = 0;      // increments to cancel in-flight scripts
+  let timers = [];
+  let stats = { words: 0, signs: 0 };
+
+  const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+  const wait = (ms) => new Promise(res => timers.push(setTimeout(res, ms)));
+
+  /* ------------------------------------------------------------------ *
+   * Hand landmark rendering
+   * ------------------------------------------------------------------ */
+  // MediaPipe-style 21-landmark base model (wrist at origin, hand points up)
+  const BASE = [
+    [0,0],[-0.12,-0.08],[-0.22,-0.18],[-0.30,-0.28],[-0.36,-0.37],
+    [-0.08,-0.42],[-0.10,-0.60],[-0.11,-0.72],[-0.12,-0.82],
+    [0.02,-0.44],[0.02,-0.64],[0.02,-0.77],[0.02,-0.88],
+    [0.12,-0.42],[0.14,-0.60],[0.15,-0.72],[0.16,-0.82],
+    [0.20,-0.36],[0.24,-0.50],[0.26,-0.60],[0.28,-0.68]
+  ];
+  const FINGERS = [ [1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16],[17,18,19,20] ];
+  const MCP = [1,5,9,13,17];
+  const CONNS = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [5,9],[9,10],[10,11],[11,12],
+    [9,13],[13,14],[14,15],[15,16],
+    [13,17],[17,18],[18,19],[19,20],
+    [0,17]
+  ];
+
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = r.width * dpr;
+    canvas.height = r.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+
+  // compute one hand's screen-space landmarks
+  function computeHand(t, cx, cy, scale, rot, curls) {
+    const pts = BASE.map(p => [p[0], p[1]]);
+    // per-finger curl: pull joints toward the mcp along the finger
+    FINGERS.forEach((fg, fi) => {
+      const mcp = BASE[MCP[fi]];
+      const c = curls[fi];
+      fg.forEach((idx, j) => {
+        if (j === 0) return; // keep mcp
+        const pull = c * (0.32 * j);
+        pts[idx][0] = BASE[idx][0] + (mcp[0] - BASE[idx][0]) * pull;
+        pts[idx][1] = BASE[idx][1] + (mcp[1] - BASE[idx][1]) * pull;
+      });
+    });
+    const cosr = Math.cos(rot), sinr = Math.sin(rot);
+    return pts.map(([x,y]) => {
+      const rx = x*cosr - y*sinr;
+      const ry = x*sinr + y*cosr;
+      return [cx + rx*scale, cy + ry*scale];
+    });
+  }
+
+  function drawHand(pts, color, glow) {
+    // connections
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.shadowColor = glow; ctx.shadowBlur = 12;
+    ctx.strokeStyle = color; ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    CONNS.forEach(([a,b]) => { ctx.moveTo(pts[a][0], pts[a][1]); ctx.lineTo(pts[b][0], pts[b][1]); });
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    // joints
+    pts.forEach((p, i) => {
+      const isTip = [4,8,12,16,20].includes(i);
+      ctx.beginPath();
+      ctx.arc(p[0], p[1], isTip ? 4.6 : 3, 0, Math.PI*2);
+      ctx.fillStyle = isTip ? '#fff' : color;
+      ctx.fill();
+      if (isTip) { ctx.lineWidth = 1.5; ctx.strokeStyle = color; ctx.stroke(); }
+    });
+  }
+
+  let rafId = null;
+  function loop() {
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    ctx.clearRect(0,0,w,h);
+    const t = performance.now() / 1000;
+
+    const coral = getComputedStyle(document.documentElement).getPropertyValue('--coral').trim() || '#e0563d';
+    const violet = getComputedStyle(document.documentElement).getPropertyValue('--violet').trim() || '#7b52cf';
+
+    if (mode === 'sign') {
+      // single tracked hand, gentle motion + shifting finger curls
+      const cx = w*0.5, cy = h*0.62;
+      const scale = h*0.62;
+      const rot = Math.sin(t*0.9)*0.18 - 0.05;
+      const curls = [
+        0.15 + 0.15*Math.sin(t*1.3),
+        0.10 + 0.35*Math.abs(Math.sin(t*0.8)),
+        0.10 + 0.35*Math.abs(Math.sin(t*0.8+0.6)),
+        0.15 + 0.35*Math.abs(Math.sin(t*0.8+1.1)),
+        0.20 + 0.35*Math.abs(Math.sin(t*0.8+1.6)),
+      ];
+      const dx = Math.sin(t*0.7)*w*0.03, dy = Math.cos(t*0.55)*h*0.02;
+      drawHand(computeHand(t, cx+dx, cy+dy, scale, rot, curls), coral, 'rgba(224,86,61,0.55)');
+    } else {
+      // two AI-generated hands "performing" a sign
+      const scale = h*0.5;
+      const cyy = h*0.6;
+      const spread = w*0.17;
+      const rotL = -0.25 + Math.sin(t*1.1)*0.2;
+      const rotR = 0.25 - Math.sin(t*1.1+0.4)*0.2;
+      const cL = [0.2+0.3*Math.abs(Math.sin(t*1.2)),0.2,0.2,0.25,0.3];
+      const cR = [0.2+0.3*Math.abs(Math.sin(t*1.2+0.9)),0.3,0.25,0.2,0.2];
+      drawHand(computeHand(t, w*0.5-spread, cyy+Math.sin(t*0.9)*h*0.03, scale, rotL, cL), violet, 'rgba(123,82,207,0.55)');
+      drawHand(computeHand(t, w*0.5+spread, cyy+Math.cos(t*0.9)*h*0.03, scale, rotR, cR), violet, 'rgba(123,82,207,0.55)');
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Scripted conversations
+   * ------------------------------------------------------------------ */
+  const SIGN_SCRIPT = [
+    { glosses:['HELLO','NICE','MEET-YOU'], text:"Hi there, really nice to finally meet you." },
+    { glosses:['HELP','ME','FIND'], text:"Could you help me find the right platform?" },
+    { glosses:['TRAIN','DOWNTOWN','WHICH'], text:"Which train actually goes downtown?" },
+    { glosses:['THANK-YOU','KIND'], text:"Thank you so much, that's really kind of you." },
+    { glosses:['SEE-YOU','LATER'], text:"See you later, take care!" },
+  ];
+  const VOICE_SCRIPT = [
+    { glosses:['SURE','PLATFORM','DOWN-HALL'], text:"Sure, the platform is right down the hall on your left." },
+    { glosses:['BLUE-LINE','GO','DOWNTOWN'], text:"The blue line will take you straight downtown." },
+    { glosses:['ABOUT','TEN','MINUTES'], text:"It's about a ten minute ride from here." },
+    { glosses:['YOU','WELCOME'], text:"You're very welcome, happy to help." },
+    { glosses:['SAFE','TRAVELS'], text:"Have a great trip and safe travels!" },
+  ];
+
+  /* ------------------------------------------------------------------ *
+   * Live captioning
+   * ------------------------------------------------------------------ */
+  function setDetect(gloss, conf) {
+    el.detectGloss.textContent = gloss;
+    el.confFill.style.width = conf + '%';
+    el.confVal.textContent = conf + '%';
+  }
+
+  function renderGlosses(glosses, activeCount) {
+    el.glossRow.innerHTML = '';
+    glosses.forEach((g, i) => {
+      const c = document.createElement('span');
+      c.className = 'gloss-chip' + (i < activeCount ? ' on' : '');
+      c.textContent = g;
+      el.glossRow.appendChild(c);
+    });
+  }
+
+  function nowStamp() {
+    const d = new Date();
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function commitLine(entry, conf) {
+    if (el.tEmpty) { el.tEmpty.remove(); el.tEmpty = null; }
+    const line = document.createElement('div');
+    line.className = 't-line';
+    const who = mode === 'sign' ? 'signer' : 'voice';
+    const whoLabel = mode === 'sign' ? 'Signer' : 'Speaker';
+    const playIcon = mode === 'sign'
+      ? `<span class="play" title="Play audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg></span>`
+      : '';
+    line.innerHTML = `
+      <div class="t-meta">
+        <span class="t-who ${who}">${whoLabel}</span>
+        <span class="t-time">${nowStamp()}</span>
+        <span class="t-conf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>${conf}%</span>
+      </div>
+      <div class="t-text">${playIcon}${entry.text}</div>
+      <div class="t-gloss">${mode === 'sign' ? 'Recognized' : 'Produced'}: ${entry.glosses.join(' · ')}</div>
+    `;
+    el.transcript.appendChild(line);
+    el.transcript.scrollTop = el.transcript.scrollHeight;
+
+    // bump stats
+    stats.words += entry.text.split(/\s+/).length;
+    stats.signs += entry.glosses.length;
+    animateCount(el.sWords, stats.words);
+    animateCount(el.sSigns, stats.signs);
+  }
+
+  function animateCount(node, target) {
+    const start = parseInt(node.textContent) || 0;
+    const dur = 500; const t0 = performance.now();
+    function step(now) {
+      const p = Math.min((now - t0) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      node.textContent = Math.round(start + (target - start) * eased);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  async function runScript(seq) {
+    const script = mode === 'sign' ? SIGN_SCRIPT : VOICE_SCRIPT;
+    let i = 0;
+    while (running && seq === sessionSeq) {
+      const entry = script[i % script.length];
+      const words = entry.text.split(' ');
+      const conf = 88 + Math.floor(Math.random() * 11);
+
+      // reset live line
+      el.liveText.innerHTML = '<span class="cursor"></span>';
+      if (mode === 'voice') { el.glossRow.style.display = 'flex'; renderGlosses(entry.glosses, 0); }
+      else { el.glossRow.style.display = 'none'; }
+
+      // cycle detected/produced gloss + build caption word by word
+      let built = '';
+      for (let w = 0; w < words.length; w++) {
+        if (!running || seq !== sessionSeq) return;
+        // move gloss badge across the phrase
+        const gi = Math.min(Math.floor(w / words.length * entry.glosses.length), entry.glosses.length - 1);
+        setDetect(entry.glosses[gi], 80 + Math.floor(Math.random()*18));
+        if (mode === 'voice') renderGlosses(entry.glosses, gi + 1);
+        el.latency.textContent = (34 + Math.floor(Math.random()*16)) + ' ms';
+
+        built += (w ? ' ' : '') + words[w];
+        el.liveText.innerHTML = built + '<span class="cursor"></span>';
+        await wait(150 + Math.random()*130);
+      }
+      if (!running || seq !== sessionSeq) return;
+
+      // settle: final confidence, all glosses lit
+      setDetect(entry.glosses[entry.glosses.length-1], conf);
+      if (mode === 'voice') renderGlosses(entry.glosses, entry.glosses.length);
+      el.liveText.innerHTML = built;
+      await wait(650);
+
+      commitLine(entry, conf);
+      i++;
+      await wait(1100);
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Session control
+   * ------------------------------------------------------------------ */
+  function setStatus(state) {
+    if (state === 'live') {
+      el.statusPill.classList.add('is-live');
+      el.statusTxt.textContent = 'Camera live';
+    } else {
+      el.statusPill.classList.remove('is-live');
+      el.statusTxt.textContent = state === 'connecting' ? 'Connecting' : 'Camera idle';
+    }
+  }
+
+  async function startSession() {
+    // connecting state
+    el.overlay.dataset.state = 'connecting';
+    el.overlayTitle.innerHTML = 'Connecting<span class="dots-load"></span>';
+    el.overlayText.textContent = 'Calibrating hand tracking and warming up the translation model.';
+    el.overlay.querySelector('.btn-start').style.display = 'none';
+    document.getElementById('overlayGlyph').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.2-8.5"/></svg>';
+    setStatus('connecting');
+    resize();
+    if (!rafId) loop();
+
+    await wait(1400);
+
+    // go live
+    el.overlay.style.display = 'none';
+    running = true;
+    body.dataset.running = 'true';
+    el.endBtn.disabled = false;
+    setStatus('live');
+    sessionSeq++;
+    runScript(sessionSeq);
+    startWave();
+  }
+
+  function endSession() {
+    running = false;
+    body.dataset.running = 'false';
+    sessionSeq++;
+    clearTimers();
+    stopWave();
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    ctx.clearRect(0,0,canvas.getBoundingClientRect().width, canvas.getBoundingClientRect().height);
+    el.endBtn.disabled = true;
+    setStatus('idle');
+    setDetect('—', 0);
+    el.liveText.innerHTML = '<span class="live-idle">Waiting for input…</span>';
+    el.glossRow.style.display = 'none';
+    // restore idle overlay
+    el.overlay.style.display = 'grid';
+    el.overlay.dataset.state = 'idle';
+    el.overlayTitle.textContent = 'Session ended';
+    el.overlayText.textContent = 'Your transcript is saved below. Start again whenever you like.';
+    const b = el.overlay.querySelector('.btn-start');
+    b.style.display = 'inline-flex';
+    b.querySelector('svg').nextSibling && (b.childNodes[b.childNodes.length-1].textContent = ' Start again');
+    document.getElementById('overlayGlyph').innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 3 14 9-14 9V3z"/></svg>';
+  }
+
+  function switchMode(next) {
+    if (mode === next) return;
+    mode = next;
+    body.dataset.mode = next;
+    el.modeSign.setAttribute('aria-pressed', next === 'sign');
+    el.modeVoice.setAttribute('aria-pressed', next === 'voice');
+
+    if (next === 'sign') {
+      el.dirTxt.textContent = 'ASL to spoken English';
+      el.liveTag.textContent = 'Signer';
+      el.liveSub.textContent = 'interpreting live';
+      el.detectLabel.textContent = 'Recognizing sign';
+    } else {
+      el.dirTxt.textContent = 'Spoken English to ASL';
+      el.liveTag.textContent = 'Speaker';
+      el.liveSub.textContent = 'generating signs';
+      el.detectLabel.textContent = 'Producing sign';
+    }
+
+    if (running) {
+      // restart the script for the new mode without dropping the session
+      sessionSeq++;
+      clearTimers();
+      el.liveText.innerHTML = '<span class="cursor"></span>';
+      el.glossRow.style.display = next === 'voice' ? 'flex' : 'none';
+      setDetect('—', 0);
+      runScript(sessionSeq);
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Waveform (voice mode)
+   * ------------------------------------------------------------------ */
+  const WAVE_BARS = 48;
+  let waveRaf = null;
+  for (let i = 0; i < WAVE_BARS; i++) { const s = document.createElement('span'); el.wave.appendChild(s); }
+  const waveEls = el.wave.querySelectorAll('span');
+  function startWave() {
+    if (waveRaf) return;
+    const anim = () => {
+      const t = performance.now() / 1000;
+      waveEls.forEach((s, i) => {
+        const base = mode === 'voice' ? (0.25 + 0.6*Math.abs(Math.sin(t*3 + i*0.4)) * (0.5 + 0.5*Math.sin(t*1.3 + i))) : 0.1;
+        s.style.transform = `scaleY(${Math.max(0.08, Math.min(base, 1))})`;
+      });
+      waveRaf = requestAnimationFrame(anim);
+    };
+    anim();
+  }
+  function stopWave() { if (waveRaf) { cancelAnimationFrame(waveRaf); waveRaf = null; } }
+
+  /* ------------------------------------------------------------------ *
+   * Wire up
+   * ------------------------------------------------------------------ */
+  el.startBtn.addEventListener('click', startSession);
+  el.endBtn.addEventListener('click', endSession);
+  el.modeSign.addEventListener('click', () => switchMode('sign'));
+  el.modeVoice.addEventListener('click', () => switchMode('voice'));
+
+  document.getElementById('camBtn').addEventListener('click', (e) => e.currentTarget.classList.toggle('off'));
+  document.getElementById('micBtn').addEventListener('click', (e) => e.currentTarget.classList.toggle('off'));
+
+  resize();
+})();
+</script>
+</body>
+</html>
