@@ -109,8 +109,11 @@ const _pWorldQ = new THREE.Quaternion()
 const _invPQ = new THREE.Quaternion()
 const _desiredLocal = new THREE.Vector3()
 const _aimQ = new THREE.Quaternion()
-const _curlQ = new THREE.Quaternion()
-const _outQ = new THREE.Quaternion()
+  const _curlQ = new THREE.Quaternion()
+  const _outQ = new THREE.Quaternion()
+  const _twistQ = new THREE.Quaternion()
+  const _handWorldQ = new THREE.Quaternion()
+  const _faxis = new THREE.Vector3()
 
 function findBone(root: THREE.Object3D, name: string): THREE.Bone | null {
   let hit: THREE.Bone | null = null
@@ -132,9 +135,15 @@ function aimBone(bone: THREE.Bone, worldDir: THREE.Vector3) {
   bone.updateWorldMatrix(false, false)
 }
 
+// Max wrist pronation applied at full rest so the palm rolls in to face the
+// thigh instead of presenting forward/up. Radians.
+const REST_PRONATION = 1.5
+
 // Analytic two-bone IK: aim the model's upperarm + forearm bones so the wrist
 // reaches `target` (world space), bending the elbow toward a downward pole.
-function solveArm(rig: ArmRig, target: THREE.Vector3) {
+// `restT` (0..1) blends in a pronation twist so the palm faces the body when
+// the arm is hanging at rest.
+function solveArm(rig: ArmRig, target: THREE.Vector3, restT = 0) {
   const S = rig.shoulderWorld
   _toT.subVectors(target, S)
   const total = rig.upperLen + rig.foreLen
@@ -162,6 +171,27 @@ function solveArm(rig: ArmRig, target: THREE.Vector3) {
   // Hand follows the forearm at its bind orientation.
   rig.hand.quaternion.copy(rig.handRest)
   rig.hand.updateWorldMatrix(false, false)
+
+  // Rest-only pronation: roll the hand about the forearm's world axis
+  // (elbow -> wrist) so the palm rolls in to face the thigh instead of
+  // presenting forward. Done in world space then converted back to local so
+  // it is true supination/pronation regardless of the bone's local axes.
+  // At restT=0 (signing) nothing is applied.
+  if (restT > 0) {
+    _faxis.subVectors(_wrist, _elbow).normalize()
+    _twistQ.setFromAxisAngle(_faxis, rig.poleSign * REST_PRONATION * restT)
+    rig.hand.getWorldQuaternion(_handWorldQ)
+    _handWorldQ.premultiply(_twistQ)
+    const parent = rig.hand.parent
+    if (parent) {
+      parent.getWorldQuaternion(_pWorldQ)
+      _invPQ.copy(_pWorldQ).invert()
+      rig.hand.quaternion.copy(_invPQ).multiply(_handWorldQ)
+    } else {
+      rig.hand.quaternion.copy(_handWorldQ)
+    }
+    rig.hand.updateWorldMatrix(false, false)
+  }
 }
 
 function applyFingers(rig: ArmRig, shape: HandShape) {
@@ -383,7 +413,7 @@ export function FBXSigner({
         _target.lerp(rig.restWorld, t)
       }
 
-      solveArm(rig, _target)
+      solveArm(rig, _target, t)
       applyFingers(rig, hand.shape)
     }
   })
