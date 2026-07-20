@@ -1,9 +1,9 @@
 import { BrandMark } from "./icons"
 import type { SessionState } from "./use-fluent-session"
 
-export function TopBar({ state }: { state: SessionState }) {
+export function TopBar({ state, knownCount }: { state: SessionState; knownCount: number }) {
   const isLive = state === "live"
-  const statusText = isLive ? "Camera live" : state === "connecting" ? "Connecting" : "Camera idle"
+  const statusText = isLive ? "Session live" : state === "connecting" ? "Starting" : "Session idle"
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-5 border-b border-line pb-[22px]">
@@ -19,9 +19,10 @@ export function TopBar({ state }: { state: SessionState }) {
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="shadow-soft flex items-center gap-2 rounded-full border border-line bg-surface py-[7px] pl-3 pr-[14px] text-[0.85rem] font-medium text-ink-soft">
-          <b className="font-semibold text-ink">ASL</b>
-          <span className="text-[1.05rem] leading-none text-ink-faint">&#8644;</span>
           <b className="font-semibold text-ink">English</b>
+          <span className="text-[1.05rem] leading-none text-ink-faint">&rarr;</span>
+          <b className="font-semibold text-ink">ASL</b>
+          <span className="ml-1 text-ink-faint">&middot; {knownCount} signs</span>
         </div>
         <div
           className={`inline-flex items-center gap-2 rounded-full border px-[14px] py-2 text-[0.8rem] font-semibold tracking-[0.01em] transition-colors ${

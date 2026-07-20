@@ -11,26 +11,33 @@ export function FluentStudio() {
 
   return (
     <div className="mx-auto max-w-[1220px] px-[clamp(18px,3vw,34px)] py-[clamp(18px,3vw,34px)]">
-      <TopBar state={s.state} />
+      <TopBar state={s.state} knownCount={s.knownCount} />
 
       <main className="mt-[26px] grid items-start gap-[22px] lg:grid-cols-[minmax(0,1.5fr)_minmax(340px,1fr)]">
         <Stage
+          playerRef={s.playerRef}
+          onProgress={s.handleProgress}
           mode={s.mode}
           state={s.state}
           detect={s.detect}
-          latency={s.latency}
-          camOff={s.camOff}
-          micOff={s.micOff}
+          isSigning={s.isSigning}
+          text={s.text}
+          setText={s.setText}
+          speed={s.speed}
+          setSpeed={s.setSpeed}
+          listening={s.listening}
+          voiceSupported={s.voiceSupported}
           onStart={s.start}
           onEnd={s.end}
+          onSubmit={s.submit}
+          onStopSigning={s.stopSigning}
           onMode={s.switchMode}
-          onToggleCam={s.toggleCam}
           onToggleMic={s.toggleMic}
         />
-        <StreamPanel mode={s.mode} live={s.live} glossRow={s.glossRow} transcript={s.transcript} />
+        <StreamPanel live={s.live} glossRow={s.glossRow} transcript={s.transcript} onSpeak={s.speak} />
       </main>
 
-      <StatStrip words={s.stats.words} signs={s.stats.signs} />
+      <StatStrip words={s.stats.words} signs={s.stats.signs} knownCount={s.knownCount} speed={s.speed} />
     </div>
   )
 }

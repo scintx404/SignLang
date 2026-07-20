@@ -26,18 +26,28 @@ function useCountUp(target: number) {
   return value
 }
 
-export function StatStrip({ words, signs }: { words: number; signs: number }) {
+export function StatStrip({
+  words,
+  signs,
+  knownCount,
+  speed,
+}: {
+  words: number
+  signs: number
+  knownCount: number
+  speed: number
+}) {
   const wordCount = useCountUp(words)
   const signCount = useCountUp(signs)
 
   return (
     <footer className="mt-[22px] flex flex-wrap items-baseline gap-x-[clamp(20px,5vw,60px)] gap-y-4 border-t border-line pt-5">
       <Stat n={String(wordCount)} k="words translated" />
-      <Stat n={String(signCount)} k="signs recognized" />
-      <Stat n="42" unit=" ms" k="avg latency" />
-      <Stat n="31" k="sign languages" />
+      <Stat n={String(signCount)} k="signs produced" />
+      <Stat n={String(knownCount)} k="signs in vocabulary" />
+      <Stat n={speed.toString()} unit="×" k="playback speed" />
       <p className="ml-auto max-w-[34ch] self-center text-[0.8rem] text-ink-faint">
-        On-device hand tracking. Video never leaves the browser: only the translated text does.
+        Runs entirely in your browser. Known words use lexical signs; anything else is fingerspelled letter by letter.
       </p>
     </footer>
   )
