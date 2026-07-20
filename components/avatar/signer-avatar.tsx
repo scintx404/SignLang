@@ -96,12 +96,12 @@ function solveArm(
 }
 
 export function SignerAvatar({ playerRef }: { playerRef: React.MutableRefObject<PosePlayer> }) {
-  const rUpper = useRef<THREE.Mesh>(null)
-  const rFore = useRef<THREE.Mesh>(null)
+  const rUpper = useRef<THREE.Group>(null)
+  const rFore = useRef<THREE.Group>(null)
   const rHandWrap = useRef<THREE.Group>(null)
   const rHand = useRef<HandHandle>(null)
-  const lUpper = useRef<THREE.Mesh>(null)
-  const lFore = useRef<THREE.Mesh>(null)
+  const lUpper = useRef<THREE.Group>(null)
+  const lFore = useRef<THREE.Group>(null)
   const lHandWrap = useRef<THREE.Group>(null)
   const lHand = useRef<HandHandle>(null)
   const torso = useRef<THREE.Group>(null)
@@ -190,28 +190,36 @@ export function SignerAvatar({ playerRef }: { playerRef: React.MutableRefObject<
         </mesh>
       </group>
 
-      {/* Right arm */}
-      <mesh ref={rUpper} castShadow>
-        <capsuleGeometry args={[0.045, UPPER_LEN, 6, 12]} />
-        <meshStandardMaterial color={SHIRT} roughness={0.85} />
-      </mesh>
-      <mesh ref={rFore} castShadow>
-        <capsuleGeometry args={[0.038, FORE_LEN, 6, 12]} />
-        <meshStandardMaterial color={SKIN} roughness={0.72} />
-      </mesh>
+      {/* Right arm (bones point +Y toward child; meshes offset by half length) */}
+      <group ref={rUpper}>
+        <mesh position={[0, UPPER_LEN / 2, 0]} castShadow>
+          <capsuleGeometry args={[0.045, UPPER_LEN, 6, 12]} />
+          <meshStandardMaterial color={SHIRT} roughness={0.85} />
+        </mesh>
+      </group>
+      <group ref={rFore}>
+        <mesh position={[0, FORE_LEN / 2, 0]} castShadow>
+          <capsuleGeometry args={[0.038, FORE_LEN, 6, 12]} />
+          <meshStandardMaterial color={SKIN} roughness={0.72} />
+        </mesh>
+      </group>
       <group ref={rHandWrap} scale={[1.35, 1.35, 1.35]}>
         <Hand ref={rHand} side="right" />
       </group>
 
       {/* Left arm */}
-      <mesh ref={lUpper} castShadow>
-        <capsuleGeometry args={[0.045, UPPER_LEN, 6, 12]} />
-        <meshStandardMaterial color={SHIRT} roughness={0.85} />
-      </mesh>
-      <mesh ref={lFore} castShadow>
-        <capsuleGeometry args={[0.038, FORE_LEN, 6, 12]} />
-        <meshStandardMaterial color={SKIN} roughness={0.72} />
-      </mesh>
+      <group ref={lUpper}>
+        <mesh position={[0, UPPER_LEN / 2, 0]} castShadow>
+          <capsuleGeometry args={[0.045, UPPER_LEN, 6, 12]} />
+          <meshStandardMaterial color={SHIRT} roughness={0.85} />
+        </mesh>
+      </group>
+      <group ref={lFore}>
+        <mesh position={[0, FORE_LEN / 2, 0]} castShadow>
+          <capsuleGeometry args={[0.038, FORE_LEN, 6, 12]} />
+          <meshStandardMaterial color={SKIN} roughness={0.72} />
+        </mesh>
+      </group>
       <group ref={lHandWrap} scale={[1.35, 1.35, 1.35]}>
         <Hand ref={lHand} side="left" />
       </group>

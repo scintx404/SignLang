@@ -82,6 +82,7 @@ function lerpHand(a: HandRuntime, b: HandRuntime, t: number): HandRuntime {
  */
 export class PosePlayer {
   private timeline: TimelineFrame[] = []
+  private tokens: SignToken[] = []
   private idx = 0
   private elapsed = 0
   private playing = false
@@ -89,6 +90,7 @@ export class PosePlayer {
   private lastToken = -1
 
   onToken?: (tokenIndex: number) => void
+  onProgress?: (label: string, index: number, total: number) => void
   onDone?: () => void
 
   get isPlaying() {
@@ -96,6 +98,7 @@ export class PosePlayer {
   }
 
   load(tokens: SignToken[]) {
+    this.tokens = tokens
     const timeline: TimelineFrame[] = []
     tokens.forEach((token, tokenIndex) => {
       for (const frame of token.sign.frames) {
@@ -146,6 +149,8 @@ export class PosePlayer {
       if (frame.tokenIndex !== this.lastToken) {
         this.lastToken = frame.tokenIndex
         this.onToken?.(frame.tokenIndex)
+        const token = this.tokens[frame.tokenIndex]
+        if (token) this.onProgress?.(token.label, frame.tokenIndex, this.tokens.length)
       }
 
       this.elapsed += dt * 1000
