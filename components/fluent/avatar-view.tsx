@@ -19,11 +19,11 @@ const AvatarStage = dynamic(() => import("@/components/avatar/avatar-stage").the
 export function AvatarView({
   playerRef,
   onProgress,
-  glbUrl,
+  modelUrl,
 }: {
   playerRef: React.MutableRefObject<PosePlayer>
   onProgress?: (label: string, index: number, total: number) => void
-  glbUrl?: string
+  modelUrl?: string
 }) {
-  return <AvatarStage playerRef={playerRef} onProgress={onProgress} glbUrl={glbUrl} />
+  return <AvatarStage playerRef={playerRef} onProgress={onProgress} modelUrl={modelUrl} />
 }

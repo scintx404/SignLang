@@ -3,18 +3,21 @@
 /**
  * Rigged FBX signer.
  *
- * Drives the imported Reallusion "Character Creator" rig
- * (public/models/SignerModelRigged.fbx) from the SAME PosePlayer output that
- * fed the old procedural avatar. The abstract per-frame hand targets and finger
- * curls are mapped onto the model's real skeleton:
+ * Drives the imported rigged model (public/models/SignerModelRigged.fbx) from
+ * the SAME PosePlayer output that fed the old procedural avatar. The abstract
+ * per-frame hand targets and finger curls are mapped onto the model's real
+ * skeleton:
  *
  *   - Each arm is posed with analytic two-bone IK (upperarm + forearm) that
- *     aims the model's actual bones at a world-space wrist target.
+ *     aims the model's actual bones at a world-space wrist target. The pose
+ *     targets are the exact positions that were tuned for the old avatar, so
+ *     the signing motion stays framed the same way on screen.
  *   - Each finger's three phalanx bones are curled around the finger's natural
  *     bend axis, relative to the model's bind pose.
  *
- * The rig was introspected offline: every bone's child extends along its local
- * +Y axis and fingers bend about local +X.
+ * The rig was introspected offline: it is a Reallusion-style "CC_Base_*"
+ * skeleton where every bone's child extends along its local +Y axis and
+ * fingers bend about local +X. The shoulders sit at model-local Y ≈ 33.8.
  */
 
 import { useEffect, useMemo, useRef } from "react"
@@ -25,25 +28,14 @@ import * as THREE from "three"
 import type { PosePlayer, Pose } from "@/lib/sign/pose-player"
 import type { HandShape, FingerName } from "@/lib/sign/types"
 
-// Abstract-avatar shoulder anchors used by the PosePlayer (see
-// signer-avatar.tsx). Pose targets are relative to these, so we re-map them
-// onto the model's own shoulder + reach.
-//   "pos" = the +x side of the screen (the pose's right hand)
-//   "neg" = the -x side of the screen (the pose's left hand)
-const ABS_SHOULDER = {
-  pos: new THREE.Vector3(0.2, 1.4, 0.02),
-  neg: new THREE.Vector3(-0.2, 1.4, 0.02),
-}
-const ABS_REACH = 0.59 // UPPER_LEN + FORE_LEN of the abstract avatar.
-
 // The model faces +Z (toward the camera), so its anatomical LEFT arm sits on
 // the +x side of the screen. To preserve the exact on-screen placement of the
 // previous avatar we drive:
 //   pose.right (screen +x) -> model's L_* arm
 //   pose.left  (screen -x) -> model's R_* arm
 const ARMS = [
-  { poseKey: "right" as const, abs: ABS_SHOULDER.pos, prefix: "CC_Base_L_" },
-  { poseKey: "left" as const, abs: ABS_SHOULDER.neg, prefix: "CC_Base_R_" },
+  { poseKey: "right" as const, prefix: "CC_Base_L_" },
+  { poseKey: "left" as const, prefix: "CC_Base_R_" },
 ]
 
 const FINGER_BONE: Record<FingerName, string> = {
@@ -62,8 +54,10 @@ const THUMB_GAIN = [0.55, 0.85, 0.7]
 const BEND_AXIS = new THREE.Vector3(1, 0, 0)
 const CHILD_AXIS = new THREE.Vector3(0, 1, 0) // every bone's child is along +Y
 
-// Target shoulder height (scene units) so framing matches the old avatar.
-const TARGET_SHOULDER_Y = 1.35
+// The old procedural avatar placed its shoulder line at local Y = 1.4 inside
+// the stage group; the camera framing was tuned around that. Match it so the
+// head stays in frame and the hands sign in the same on-screen region.
+const TARGET_SHOULDER_LOCAL_Y = 1.4
 
 interface FingerJoint {
   bone: THREE.Bone
@@ -72,21 +66,18 @@ interface FingerJoint {
 
 interface ArmRig {
   poseKey: "right" | "left"
-  abs: THREE.Vector3
   upper: THREE.Bone
   fore: THREE.Bone
   hand: THREE.Bone
   shoulderWorld: THREE.Vector3
   upperLen: number
   foreLen: number
-  reachWorld: number
   poleSign: number
   handRest: THREE.Quaternion
   fingers: Record<FingerName, FingerJoint[]>
 }
 
 // Per-frame scratch objects (no allocation in the render loop).
-const _absVec = new THREE.Vector3()
 const _dir = new THREE.Vector3()
 const _target = new THREE.Vector3()
 const _toT = new THREE.Vector3()
@@ -134,7 +125,7 @@ function solveArm(rig: ArmRig, target: THREE.Vector3) {
   const a = (rig.upperLen * rig.upperLen - rig.foreLen * rig.foreLen + d * d) / (2 * d)
   const h = Math.sqrt(Math.max(0, rig.upperLen * rig.upperLen - a * a))
   _mid.copy(S).addScaledVector(_dir, a)
-  _pole.set(rig.poleSign * 0.25, -1, -0.45).normalize()
+  _pole.set(rig.poleSign * 0.3, -1, -0.4).normalize()
   _poleProj.copy(_pole).addScaledVector(_dir, -_pole.dot(_dir))
   if (_poleProj.lengthSq() < 1e-6) _poleProj.set(0, -1, 0)
   _poleProj.normalize()
@@ -178,27 +169,53 @@ export function FBXSigner({
   const arms = useRef<ArmRig[]>([])
 
   useEffect(() => {
+    // The shipped FBX (a Tripo export) references an external "base_color"
+    // texture that isn't bundled with the model, so its baked material resolves
+    // to a black map. Swap in a clean, uniform mannequin material so the figure
+    // is clearly lit and the hand/finger shapes read well while signing.
+    const skin = new THREE.MeshStandardMaterial({
+      color: "#c8a488",
+      roughness: 0.62,
+      metalness: 0.0,
+    })
     model.traverse((o) => {
       const mesh = o as THREE.SkinnedMesh
       if (mesh.isMesh || mesh.isSkinnedMesh) {
         mesh.castShadow = true
         mesh.receiveShadow = true
         mesh.frustumCulled = false
+        const old = mesh.material
+        if (Array.isArray(old)) old.forEach((m) => m?.dispose?.())
+        else old?.dispose?.()
+        mesh.material = skin
       }
     })
 
-    // Scale so shoulders sit near TARGET_SHOULDER_Y, then plant feet on the
-    // parent group's floor.
+    const rShoulder = findBone(model, "CC_Base_R_Upperarm")
+
+    // Scale the model so its shoulder line sits at TARGET_SHOULDER_LOCAL_Y in
+    // the stage group. We measure the shoulder height in the model's own local
+    // frame (parent-independent) so the math holds regardless of the group
+    // offset. The camera frames the upper body, so shoulder height — not foot
+    // height — is what must stay locked.
     model.scale.setScalar(1)
     model.position.set(0, 0, 0)
     model.updateWorldMatrix(true, true)
-    const rShoulder = findBone(model, "CC_Base_R_Upperarm")
-    const shoulderRaw = rShoulder ? rShoulder.getWorldPosition(new THREE.Vector3()).y : 33.8
-    const scale = TARGET_SHOULDER_Y / (shoulderRaw || 33.8)
+    const shoulderLocalUnscaled = rShoulder
+      ? model.worldToLocal(rShoulder.getWorldPosition(new THREE.Vector3())).y
+      : 33.8
+    const scale = TARGET_SHOULDER_LOCAL_Y / (shoulderLocalUnscaled || 33.8)
     model.scale.setScalar(scale)
+    // Feet at group-local 0: shoulder height above origin is now
+    // shoulderLocalUnscaled * scale === TARGET_SHOULDER_LOCAL_Y, so origin sits
+    // at 0 and the shoulder lands exactly on target.
+    model.position.y = TARGET_SHOULDER_LOCAL_Y - shoulderLocalUnscaled * scale
     model.updateWorldMatrix(true, true)
+    // Center horizontally on the mesh bounds.
     const box = new THREE.Box3().setFromObject(model)
-    model.position.y = -box.min.y
+    const parent = model.parent
+    const centerX = (box.min.x + box.max.x) / 2
+    model.position.x += (parent ? parent.position.x : 0) - centerX
     model.updateWorldMatrix(true, true)
 
     const rigs: ArmRig[] = []
@@ -226,14 +243,12 @@ export function FBXSigner({
 
       rigs.push({
         poseKey: arm.poseKey,
-        abs: arm.abs,
         upper,
         fore,
         hand,
         shoulderWorld: sPos,
         upperLen,
         foreLen,
-        reachWorld: upperLen + foreLen,
         poleSign: Math.sign(sPos.x) || 1,
         handRest: hand.quaternion.clone(),
         fingers,
@@ -245,17 +260,15 @@ export function FBXSigner({
   useFrame((_, delta) => {
     const pose: Pose = playerRef.current.update(Math.min(delta, 0.05))
     const rigs = arms.current
+    const parent = model.parent
     for (let i = 0; i < rigs.length; i++) {
       const rig = rigs[i]
       const hand = rig.poseKey === "right" ? pose.right : pose.left
 
-      // Map the abstract target (relative to the abstract shoulder/reach) onto
-      // this arm's own shoulder + reach, preserving world-space direction.
-      _absVec.set(hand.pos[0], hand.pos[1], hand.pos[2])
-      _dir.subVectors(_absVec, rig.abs)
-      const frac = Math.min(_dir.length() / ABS_REACH, 1)
-      _dir.normalize()
-      _target.copy(rig.shoulderWorld).addScaledVector(_dir, frac * rig.reachWorld)
+      // The pose target is expressed in the stage-group's local space (exactly
+      // like the old avatar). Convert it to world space for the IK solver.
+      _target.set(hand.pos[0], hand.pos[1], hand.pos[2])
+      if (parent) parent.localToWorld(_target)
 
       solveArm(rig, _target)
       applyFingers(rig, hand.shape)

@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useEffect, useRef, useState } from "react"
+import { Component, Suspense, useEffect, type ReactNode } from "react"
 import { Canvas } from "@react-three/fiber"
 import { OrbitControls, ContactShadows } from "@react-three/drei"
 import * as THREE from "three"
@@ -11,43 +11,36 @@ import { PosePlayer } from "@/lib/sign/pose-player"
 // Default rigged signer shipped with the app.
 const DEFAULT_MODEL_URL = "/models/SignerModelRigged.fbx"
 
-function ModelWithFallback({
-  playerRef,
-  url,
-  onError,
-}: {
-  playerRef: React.MutableRefObject<PosePlayer>
-  url: string
-  onError: () => void
-}) {
-  useEffect(() => {
-    let cancelled = false
-    fetch(url, { method: "HEAD" })
-      .then((r) => {
-        if (!cancelled && !r.ok) onError()
-      })
-      .catch(() => {
-        if (!cancelled) onError()
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [url, onError])
+/**
+ * Catches errors thrown while loading/parsing the rigged model (e.g. a missing
+ * or corrupt FBX) and renders the procedural avatar instead so the stage never
+ * goes blank.
+ */
+class ModelBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
 
-  return <FBXSigner playerRef={playerRef} url={url} />
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidCatch(error: unknown) {
+    console.log("[v0] Rigged model failed to load, using procedural fallback:", error)
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children
+  }
 }
 
 export function AvatarStage({
   playerRef,
   onProgress,
-  glbUrl,
+  modelUrl = DEFAULT_MODEL_URL,
 }: {
   playerRef: React.MutableRefObject<PosePlayer>
   onProgress?: (label: string, index: number, total: number) => void
-  glbUrl?: string
+  modelUrl?: string
 }) {
-  const [useGlb, setUseGlb] = useState(Boolean(glbUrl))
-
   useEffect(() => {
     playerRef.current.onProgress = (label, i, total) => onProgress?.(label, i, total)
   }, [playerRef, onProgress])
@@ -74,17 +67,13 @@ export function AvatarStage({
       <pointLight position={[0, 2, 2]} intensity={0.5} color="#fff2e0" />
 
       <group position={[0, -1.0, 0]}>
-        <Suspense fallback={null}>
-          {useGlb && glbUrl ? (
-            <ModelWithFallback
-              playerRef={playerRef}
-              url={glbUrl}
-              onError={() => setUseGlb(false)}
-            />
-          ) : (
-            <SignerAvatar playerRef={playerRef} />
-          )}
-        </Suspense>
+        {/* Rigged FBX signer is the default character; the procedural avatar is
+            only used if the model fails to load. */}
+        <ModelBoundary fallback={<SignerAvatar playerRef={playerRef} />}>
+          <Suspense fallback={null}>
+            <FBXSigner playerRef={playerRef} url={modelUrl} />
+          </Suspense>
+        </ModelBoundary>
         <ContactShadows
           position={[0, 0.01, 0]}
           opacity={0.35}
