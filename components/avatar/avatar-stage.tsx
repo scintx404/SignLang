@@ -49,7 +49,7 @@ export function AvatarStage({
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: [0, 1.35, 1.35], fov: 34 }}
+      camera={{ position: [0, 1.2, 2.35], fov: 32 }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={["#26232f"]} />
@@ -86,11 +86,11 @@ export function AvatarStage({
 
       <OrbitControls
         enablePan={false}
-        minDistance={0.9}
-        maxDistance={2.6}
+        minDistance={1.2}
+        maxDistance={4}
         minPolarAngle={Math.PI * 0.25}
         maxPolarAngle={Math.PI * 0.62}
-        target={[0, 0.35, 0]}
+        target={[0, 0.3, 0]}
       />
     </Canvas>
   )
