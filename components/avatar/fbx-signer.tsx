@@ -166,9 +166,14 @@ function applyFingers(rig: ArmRig, shape: HandShape) {
     const isThumb = finger === "thumb"
     const gain = isThumb ? THUMB_GAIN : FINGER_GAIN
     const axis = isThumb ? THUMB_BEND_AXIS : BEND_AXIS
+    // The two hands are mirrored: each finger bone's child direction points to
+    // opposite world sides, so a shared rotation sign curls one hand inward and
+    // the other outward. Flip the sign for the left rig so both fold toward
+    // their own palm.
+    const sideSign = rig.poseKey === "left" ? -1 : 1
     for (let i = 0; i < chain.length; i++) {
       const { bone, rest } = chain[i]
-      const angle = CURL_SIGN * curl * (gain[i] ?? 1)
+      const angle = CURL_SIGN * sideSign * curl * (gain[i] ?? 1)
       _curlQ.setFromAxisAngle(axis, angle)
       _outQ.copy(rest).multiply(_curlQ)
       bone.quaternion.copy(_outQ)
