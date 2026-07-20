@@ -50,8 +50,9 @@ const FINGER_BONE: Record<FingerName, string> = {
 // along local +Y, while the flexion hinge (the medial-lateral axis running
 // ACROSS the fingers) is local +Z — NOT local +X, which points along world
 // vertical and was previously swinging the fingers sideways instead of
-// curling them. Rotating about local +Z folds the fingertips toward the palm.
-const CURL_SIGN = 1
+// curling them. Rotating about local -Z folds the fingertips toward the palm
+// (a positive angle hyperextended them backward over the back of the hand).
+const CURL_SIGN = -1
 const FINGER_GAIN = [0.9, 1.15, 1.0] // proximal, middle, distal phalanx
 const THUMB_GAIN = [0.55, 0.85, 0.7]
 const BEND_AXIS = new THREE.Vector3(0, 0, 1)
