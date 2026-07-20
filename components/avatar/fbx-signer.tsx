@@ -91,6 +91,8 @@ interface ArmRig {
   foreLen: number
   poleSign: number
   handRest: THREE.Quaternion
+  /** Pre-computed world-space IK target for the natural hanging-arm rest pose. */
+  restWorld: THREE.Vector3
   fingers: Record<FingerName, FingerJoint[]>
 }
 
@@ -142,7 +144,11 @@ function solveArm(rig: ArmRig, target: THREE.Vector3) {
   const a = (rig.upperLen * rig.upperLen - rig.foreLen * rig.foreLen + d * d) / (2 * d)
   const h = Math.sqrt(Math.max(0, rig.upperLen * rig.upperLen - a * a))
   _mid.copy(S).addScaledVector(_dir, a)
-  _pole.set(rig.poleSign * 0.3, -1, -0.4).normalize()
+  // Pole bends the elbow backward and slightly outward, which is how a human
+  // arm naturally hangs at rest (elbow behind the shoulder plane). During
+  // signing the targets are forward of the chest so the pole has less
+  // influence there and the motion reads correctly.
+  _pole.set(rig.poleSign * 0.15, -0.8, -0.6).normalize()
   _poleProj.copy(_pole).addScaledVector(_dir, -_pole.dot(_dir))
   if (_poleProj.lengthSq() < 1e-6) _poleProj.set(0, -1, 0)
   _poleProj.normalize()
@@ -326,6 +332,17 @@ export function FBXSigner({
         fingers[finger] = chain
       }
 
+      const poleSign = Math.sign(sPos.x) || 1
+      // Natural hanging-arm rest target: wrist hangs ~85% of full reach below
+      // the shoulder, nudged outward by 4% of total arm length so the IK pole
+      // has a stable lateral direction. z matches the shoulder so the arm
+      // drapes straight down without reaching forward or backward.
+      const reach = upperLen + foreLen
+      const restWorld = new THREE.Vector3(
+        sPos.x + poleSign * reach * 0.04,
+        sPos.y - reach * 0.85,
+        sPos.z,
+      )
       rigs.push({
         poseKey: arm.poseKey,
         upper,
@@ -334,20 +351,13 @@ export function FBXSigner({
         shoulderWorld: sPos,
         upperLen,
         foreLen,
-        poleSign: Math.sign(sPos.x) || 1,
+        poleSign,
         handRest: hand.quaternion.clone(),
+        restWorld,
         fingers,
       })
     }
     arms.current = rigs
-    for (const r of rigs) {
-      console.log(
-        "[v0] arm", r.poseKey,
-        "shoulderWorld=", r.shoulderWorld.toArray().map((n) => +n.toFixed(3)),
-        "upperLen=", r.upperLen.toFixed(3),
-        "foreLen=", r.foreLen.toFixed(3),
-      )
-    }
   }, [model])
 
   useFrame((_, delta) => {
@@ -358,13 +368,20 @@ export function FBXSigner({
       const rig = rigs[i]
       const hand = rig.poseKey === "right" ? pose.right : pose.left
 
-      // The pose target is expressed in the stage-group's local space (exactly
-      // like the old avatar). Scale it down with the model, push it clear of
-      // this model's deeper chest, and fan it slightly outward so the hands
-      // sign in front of the body instead of inside it. Then convert to world
-      // space for the IK solver.
+      // Convert the pose target from stage-group local space to world space.
       _target.set(hand.pos[0] * SIZE * X_GAIN, hand.pos[1] * SIZE, hand.pos[2] * SIZE + zShiftRef.current)
       if (parent) parent.localToWorld(_target)
+
+      // When the hand dips below the signing zone, blend the IK target toward
+      // the rig's pre-computed natural hanging-arm position so the arm looks
+      // correct in rest regardless of the pose-player constants.
+      // Signing anchors sit at world y ≈ shoulder.y - 0.30; rest starts
+      // blending at shoulder.y - 0.35 and is fully in effect at - 0.50.
+      const blendStart = rig.shoulderWorld.y - 0.35
+      const t = Math.max(0, Math.min(1, (blendStart - _target.y) / 0.15))
+      if (t > 0) {
+        _target.lerp(rig.restWorld, t)
+      }
 
       solveArm(rig, _target)
       applyFingers(rig, hand.shape)

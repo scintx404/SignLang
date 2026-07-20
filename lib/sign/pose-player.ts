@@ -23,14 +23,16 @@ interface TimelineFrame {
 // offsets are measured from. Tuned for the avatar in avatar units.
 const ANCHOR_R: [number, number, number] = [0.14, 0.98, 0.16]
 const ANCHOR_L: [number, number, number] = [-0.14, 0.98, 0.16]
-// Idle rest: hands hang naturally at the sides of the hips.
+// Idle rest: hands hang at the thighs, slightly forward of the hip plane.
 // World-space derivation from FBX rig data:
-//   shoulder world: [±0.3, 0.148, -0.308], arm reach: 0.712 m
+//   shoulder world: [±0.30, 0.148, -0.308], arm reach: 0.712 m
 //   group offset y=-1.0, SIZE=0.82, X_GAIN=1.25, zShift≈0
 //   group-local → world: x*0.82*1.25,  y*0.82 - 1.0,  z*0.82 + zShift
-// Target world [±0.36, -0.26, -0.31] → group-local [±0.35, 0.90, -0.39]
-const REST_R: [number, number, number] = [0.35, 0.90, -0.39]
-const REST_L: [number, number, number] = [-0.35, 0.90, -0.39]
+// Target world [±0.32, -0.23, -0.16] → group-local [±0.313, 0.936, -0.204]
+// A slightly-forward z (-0.16 world vs shoulder -0.308) lets the arm hang with
+// a natural slight forward drape rather than jamming straight back behind the hip.
+const REST_R: [number, number, number] = [0.313, 0.936, -0.204]
+const REST_L: [number, number, number] = [-0.313, 0.936, -0.204]
 
 function add(a: [number, number, number], b: [number, number, number]): [number, number, number] {
   return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
@@ -45,7 +47,14 @@ function restHand(side: "right" | "left"): HandRuntime {
   return { pos: side === "right" ? REST_R : REST_L, shape: REST_SHAPE }
 }
 
-const IDLE_POSE: Pose = { right: restHand("right"), left: restHand("left") }
+let _idleLogCount = 0
+function idlePose(): Pose {
+  if (_idleLogCount < 3) {
+    console.log("[v0] idlePose REST_R", REST_R, "REST_L", REST_L)
+    _idleLogCount++
+  }
+  return { right: restHand("right"), left: restHand("left") }
+}
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t
@@ -92,7 +101,7 @@ export class PosePlayer {
   private idx = 0
   private elapsed = 0
   private playing = false
-  private displayed: Pose = clonePose(IDLE_POSE)
+  private displayed: Pose = clonePose(idlePose())
   private lastToken = -1
 
   /** Playback rate multiplier. 1 = normal, <1 slower, >1 faster. */
@@ -172,7 +181,7 @@ export class PosePlayer {
         }
       }
     } else {
-      target = IDLE_POSE
+      target = idlePose()
     }
 
     // Smoothly approach the target (frame-rate independent easing).
