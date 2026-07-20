@@ -55,9 +55,19 @@ const BEND_AXIS = new THREE.Vector3(1, 0, 0)
 const CHILD_AXIS = new THREE.Vector3(0, 1, 0) // every bone's child is along +Y
 
 // The old procedural avatar placed its shoulder line at local Y = 1.4 inside
-// the stage group; the camera framing was tuned around that. Match it so the
-// head stays in frame and the hands sign in the same on-screen region.
-const TARGET_SHOULDER_LOCAL_Y = 1.4
+// the stage group; the camera framing was tuned around that. SIZE shrinks the
+// whole figure (and, below, the pose targets with it) relative to that
+// framing so the model doesn't dominate the viewport.
+const SIZE = 0.82
+const TARGET_SHOULDER_LOCAL_Y = 1.4 * SIZE
+
+// The pose targets were authored for the old avatar whose chest front sat at
+// stage-local z ≈ 0.16 with anchors at |x| ≈ 0.14. This model's torso is
+// deeper and wider, so targets are re-anchored at runtime: pushed forward so
+// they clear the measured chest front, and nudged outward from the sternum.
+const OLD_ANCHOR_Z = 0.16
+const FORWARD_MARGIN = 0.09
+const X_GAIN = 1.25
 
 interface FingerJoint {
   bone: THREE.Bone
@@ -167,6 +177,7 @@ export function FBXSigner({
   const fbx = useFBX(url)
   const model = useMemo(() => skeletonClone(fbx) as THREE.Group, [fbx])
   const arms = useRef<ArmRig[]>([])
+  const zShiftRef = useRef(0)
 
   useEffect(() => {
     // The shipped FBX (a Tripo export) references an external "base_color"
@@ -210,13 +221,51 @@ export function FBXSigner({
     // shoulderLocalUnscaled * scale === TARGET_SHOULDER_LOCAL_Y, so origin sits
     // at 0 and the shoulder lands exactly on target.
     model.position.y = TARGET_SHOULDER_LOCAL_Y - shoulderLocalUnscaled * scale
-    model.updateWorldMatrix(true, true)
-    // Center horizontally on the mesh bounds.
-    const box = new THREE.Box3().setFromObject(model)
+    // NOTE: must be updateMatrixWorld (not updateWorldMatrix) so SkinnedMesh's
+    // override refreshes bindMatrixInverse after the rescale; otherwise
+    // skinned-vertex sampling below reads through a stale bind matrix.
+    model.updateMatrixWorld(true)
+    // Measure the REAL deformed body bounds by sampling skinned vertices.
+    // Box3.setFromObject is useless here: it reads raw (un-skinned) geometry,
+    // which for this FBX collapses to a ~10cm blob at the feet.
+    const box = new THREE.Box3()
+    const _v = new THREE.Vector3()
+    model.traverse((o) => {
+      const m = o as THREE.SkinnedMesh
+      if (!m.isMesh && !m.isSkinnedMesh) return
+      const posAttr = m.geometry?.attributes?.position
+      if (!posAttr) return
+      m.skeleton?.update()
+      const stride = Math.max(1, Math.floor(posAttr.count / 5000))
+      for (let i = 0; i < posAttr.count; i += stride) {
+        if (m.isSkinnedMesh) {
+          m.getVertexPosition(i, _v)
+          _v.applyMatrix4(m.matrixWorld)
+        } else {
+          _v.fromBufferAttribute(posAttr, i).applyMatrix4(m.matrixWorld)
+        }
+        box.expandByPoint(_v)
+      }
+    })
+
+    // Center horizontally on the sampled bounds.
     const parent = model.parent
     const centerX = (box.min.x + box.max.x) / 2
     model.position.x += (parent ? parent.position.x : 0) - centerX
-    model.updateWorldMatrix(true, true)
+    model.updateMatrixWorld(true)
+
+    // Measure the front of the body (stage-group local z; the group has no
+    // rotation/scale, so world z equals stage-local z). Pose targets whose z
+    // was authored against the old avatar's chest (z ≈ 0.16) are shifted so
+    // the same offsets now land just in front of THIS model's chest.
+    const chestFrontZ = box.max.z
+    zShiftRef.current = chestFrontZ + FORWARD_MARGIN - OLD_ANCHOR_Z * SIZE
+    console.log(
+      "[v0] fbx rig: scale=", scale.toFixed(4),
+      "box=", JSON.stringify({ min: box.min.toArray().map((n) => +n.toFixed(2)), max: box.max.toArray().map((n) => +n.toFixed(2)) }),
+      "chestFrontZ=", chestFrontZ.toFixed(3),
+      "zShift=", zShiftRef.current.toFixed(3),
+    )
 
     const rigs: ArmRig[] = []
     for (const arm of ARMS) {
@@ -255,6 +304,14 @@ export function FBXSigner({
       })
     }
     arms.current = rigs
+    for (const r of rigs) {
+      console.log(
+        "[v0] arm", r.poseKey,
+        "shoulderWorld=", r.shoulderWorld.toArray().map((n) => +n.toFixed(3)),
+        "upperLen=", r.upperLen.toFixed(3),
+        "foreLen=", r.foreLen.toFixed(3),
+      )
+    }
   }, [model])
 
   useFrame((_, delta) => {
@@ -266,8 +323,11 @@ export function FBXSigner({
       const hand = rig.poseKey === "right" ? pose.right : pose.left
 
       // The pose target is expressed in the stage-group's local space (exactly
-      // like the old avatar). Convert it to world space for the IK solver.
-      _target.set(hand.pos[0], hand.pos[1], hand.pos[2])
+      // like the old avatar). Scale it down with the model, push it clear of
+      // this model's deeper chest, and fan it slightly outward so the hands
+      // sign in front of the body instead of inside it. Then convert to world
+      // space for the IK solver.
+      _target.set(hand.pos[0] * SIZE * X_GAIN, hand.pos[1] * SIZE, hand.pos[2] * SIZE + zShiftRef.current)
       if (parent) parent.localToWorld(_target)
 
       solveArm(rig, _target)

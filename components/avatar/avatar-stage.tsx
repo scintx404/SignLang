@@ -49,7 +49,7 @@ export function AvatarStage({
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: [0, 1.2, 2.35], fov: 32 }}
+      camera={{ position: [0, 0.6, 3.1], fov: 32 }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <color attach="background" args={["#26232f"]} />
