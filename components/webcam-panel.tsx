@@ -1,14 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, CameraOff, Loader2, ScanLine } from 'lucide-react'
+import { Camera, CameraOff, Loader2, Video } from 'lucide-react'
 import { classifyGesture, type Landmark } from '@/lib/gesture-classifier'
-import { cn } from '@/lib/utils'
 
-type TrackerStatus = 'idle' | 'loading' | 'running' | 'error'
+export type TrackerStatus = 'idle' | 'loading' | 'running' | 'error'
 
 interface WebcamPanelProps {
-  onSignRecognized: (sign: string) => void
+  active: boolean
+  onActiveChange: (active: boolean) => void
+  onStatusChange?: (status: TrackerStatus) => void
+  onLiveSign?: (sign: string | null) => void
+  onSignCommitted: (sign: string, confidence: number) => void
 }
 
 // MediaPipe hand skeleton connections
@@ -23,8 +26,15 @@ const HAND_CONNECTIONS: [number, number][] = [
 
 const STABLE_FRAMES = 8
 const COMMIT_COOLDOWN_MS = 1800
+const CONFIDENCE_WINDOW = 30
 
-export function WebcamPanel({ onSignRecognized }: WebcamPanelProps) {
+export function WebcamPanel({
+  active,
+  onActiveChange,
+  onStatusChange,
+  onLiveSign,
+  onSignCommitted,
+}: WebcamPanelProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number>(0)
@@ -34,11 +44,29 @@ export function WebcamPanel({ onSignRecognized }: WebcamPanelProps) {
 
   const candidateRef = useRef<{ sign: string; frames: number }>({ sign: '', frames: 0 })
   const lastCommitRef = useRef<{ sign: string; at: number }>({ sign: '', at: 0 })
+  const recentRef = useRef<(string | null)[]>([])
 
-  const [status, setStatus] = useState<TrackerStatus>('idle')
+  const [status, setStatusState] = useState<TrackerStatus>('idle')
   const [error, setError] = useState<string | null>(null)
-  const [liveSign, setLiveSign] = useState<string | null>(null)
+  const [liveSign, setLiveSignState] = useState<string | null>(null)
   const [handCount, setHandCount] = useState(0)
+
+  const onStatusChangeRef = useRef(onStatusChange)
+  onStatusChangeRef.current = onStatusChange
+  const onLiveSignRef = useRef(onLiveSign)
+  onLiveSignRef.current = onLiveSign
+  const onSignCommittedRef = useRef(onSignCommitted)
+  onSignCommittedRef.current = onSignCommitted
+
+  const setStatus = useCallback((s: TrackerStatus) => {
+    setStatusState(s)
+    onStatusChangeRef.current?.(s)
+  }, [])
+
+  const setLiveSign = useCallback((sign: string | null) => {
+    setLiveSignState(sign)
+    onLiveSignRef.current?.(sign)
+  }, [])
 
   const stopCamera = useCallback(() => {
     cancelAnimationFrame(rafRef.current)
@@ -47,10 +75,11 @@ export function WebcamPanel({ onSignRecognized }: WebcamPanelProps) {
     if (videoRef.current) videoRef.current.srcObject = null
     const canvas = canvasRef.current
     if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height)
-    setStatus('idle')
+    recentRef.current = []
+    candidateRef.current = { sign: '', frames: 0 }
     setLiveSign(null)
     setHandCount(0)
-  }, [])
+  }, [setLiveSign])
 
   const drawHands = useCallback((landmarksList: Landmark[][], canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext('2d')
@@ -58,8 +87,7 @@ export function WebcamPanel({ onSignRecognized }: WebcamPanelProps) {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     for (const lm of landmarksList) {
-      // Connections
-      ctx.strokeStyle = 'rgba(16, 185, 129, 0.9)'
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)'
       ctx.lineWidth = 3
       ctx.lineCap = 'round'
       for (const [a, b] of HAND_CONNECTIONS) {
@@ -68,12 +96,11 @@ export function WebcamPanel({ onSignRecognized }: WebcamPanelProps) {
         ctx.lineTo(lm[b].x * canvas.width, lm[b].y * canvas.height)
         ctx.stroke()
       }
-      // Joints
       for (let i = 0; i < lm.length; i++) {
         const isTip = [4, 8, 12, 16, 20].includes(i)
         ctx.beginPath()
         ctx.arc(lm[i].x * canvas.width, lm[i].y * canvas.height, isTip ? 6 : 4, 0, Math.PI * 2)
-        ctx.fillStyle = isTip ? '#ffffff' : '#10b981'
+        ctx.fillStyle = isTip ? '#e5482e' : '#ffffff'
         ctx.fill()
       }
     }
@@ -102,7 +129,10 @@ export function WebcamPanel({ onSignRecognized }: WebcamPanelProps) {
       const gesture = hands.length > 0 ? classifyGesture(hands[0]) : null
       setLiveSign(gesture?.sign ?? null)
 
-      // Stability gate: same sign for N consecutive frames before committing
+      // Rolling window of recent classifications for a confidence estimate
+      recentRef.current.push(gesture?.sign ?? null)
+      if (recentRef.current.length > CONFIDENCE_WINDOW) recentRef.current.shift()
+
       if (gesture) {
         const cand = candidateRef.current
         if (cand.sign === gesture.sign) {
@@ -118,7 +148,12 @@ export function WebcamPanel({ onSignRecognized }: WebcamPanelProps) {
         if (candidateRef.current.frames >= STABLE_FRAMES && cooled) {
           lastCommitRef.current = { sign: gesture.sign, at: now }
           candidateRef.current = { sign: gesture.sign, frames: 0 }
-          onSignRecognized(gesture.sign)
+
+          const matches = recentRef.current.filter((s) => s === gesture.sign).length
+          const window = Math.max(recentRef.current.length, 1)
+          const confidence = Math.min(0.99, Math.max(0.7, matches / window))
+
+          onSignCommittedRef.current(gesture.sign, confidence)
         }
       } else {
         candidateRef.current = { sign: '', frames: 0 }
@@ -126,13 +161,12 @@ export function WebcamPanel({ onSignRecognized }: WebcamPanelProps) {
     }
 
     rafRef.current = requestAnimationFrame(predictLoop)
-  }, [drawHands, onSignRecognized])
+  }, [drawHands, setLiveSign])
 
   const startCamera = useCallback(async () => {
     setStatus('loading')
     setError(null)
     try {
-      // Lazy-load MediaPipe (WASM) only when the camera starts
       if (!landmarkerRef.current) {
         const { FilesetResolver, HandLandmarker } = await import('@mediapipe/tasks-vision')
         const fileset = await FilesetResolver.forVisionTasks(
@@ -172,11 +206,23 @@ export function WebcamPanel({ onSignRecognized }: WebcamPanelProps) {
             ? 'No camera detected. Connect a webcam and try again.'
             : 'Failed to start hand tracking. Check your camera and connection.'
       )
-      setStatus('error')
       stopCamera()
       setStatus('error')
+      onActiveChange(false)
     }
-  }, [predictLoop, stopCamera])
+  }, [predictLoop, setStatus, stopCamera, onActiveChange])
+
+  // Controlled start/stop
+  useEffect(() => {
+    if (active) {
+      startCamera()
+    } else {
+      stopCamera()
+      setStatusState((s) => (s === 'error' ? s : 'idle'))
+      onStatusChangeRef.current?.('idle')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active])
 
   useEffect(() => {
     return () => {
@@ -191,108 +237,93 @@ export function WebcamPanel({ onSignRecognized }: WebcamPanelProps) {
   return (
     <section
       aria-label="Webcam sign language input"
-      className="flex h-full flex-col overflow-hidden rounded-lg border bg-card"
+      className="relative h-full overflow-hidden rounded-lg bg-stage shadow-[0_1px_2px_rgb(0_0_0/0.06),0_8px_32px_-12px_rgb(0_0_0/0.25)]"
     >
-      {/* Panel header */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <ScanLine className="size-4 text-primary" aria-hidden="true" />
-          <h2 className="text-sm font-semibold">Sign-to-Text</h2>
-        </div>
-        <div className="flex items-center gap-3">
-          {running && (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="relative flex size-2">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60" />
-                <span className="relative inline-flex size-2 rounded-full bg-primary" />
-              </span>
-              {handCount > 0 ? `Tracking ${handCount} hand${handCount > 1 ? 's' : ''}` : 'Live'}
+      <video
+        ref={videoRef}
+        playsInline
+        muted
+        className="absolute inset-0 size-full -scale-x-100 object-cover"
+        aria-label="Live webcam feed"
+      />
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 size-full -scale-x-100 object-cover"
+        aria-hidden="true"
+      />
+
+      {/* Top status overlay */}
+      {running && (
+        <div className="absolute left-4 top-4 flex items-center gap-2 animate-fade-in">
+          <span className="flex items-center gap-2 rounded-full bg-black/40 px-3 py-1.5 text-xs font-medium text-stage-foreground backdrop-blur-md">
+            <span className="relative flex size-2">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-70" />
+              <span className="relative inline-flex size-2 rounded-full bg-primary" />
             </span>
-          )}
-          <button
-            type="button"
-            onClick={running ? stopCamera : startCamera}
-            disabled={status === 'loading'}
-            className={cn(
-              'flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-              running
-                ? 'bg-muted text-foreground hover:bg-border'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90',
-              status === 'loading' && 'opacity-70'
-            )}
-          >
-            {status === 'loading' ? (
-              <>
-                <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                Loading model...
-              </>
-            ) : running ? (
-              <>
-                <CameraOff className="size-3.5" aria-hidden="true" />
-                Stop
-              </>
-            ) : (
-              <>
-                <Camera className="size-3.5" aria-hidden="true" />
-                Start Camera
-              </>
-            )}
-          </button>
+            {handCount > 0
+              ? `Tracking ${handCount} hand${handCount > 1 ? 's' : ''}`
+              : 'Camera live'}
+          </span>
         </div>
-      </div>
+      )}
 
-      {/* Video area */}
-      <div className="relative flex-1 bg-background">
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          className="absolute inset-0 size-full -scale-x-100 object-cover"
-          aria-label="Live webcam feed"
-        />
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 size-full -scale-x-100 object-cover"
-          aria-hidden="true"
-        />
-
-        {/* Live recognized sign overlay */}
-        {running && liveSign && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-            <div className="rounded-md border border-primary/40 bg-background/85 px-5 py-2.5 backdrop-blur-sm">
-              <p className="font-mono text-lg font-semibold text-primary">{liveSign}</p>
-            </div>
+      {/* Live recognized sign overlay */}
+      {running && liveSign && (
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 animate-scale-in">
+          <div className="rounded-full bg-black/50 px-6 py-2.5 backdrop-blur-md">
+            <p className="text-lg font-semibold text-stage-foreground">{liveSign}</p>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Idle / error states */}
-        {!running && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-            {status === 'error' ? (
-              <>
-                <CameraOff className="size-10 text-destructive" aria-hidden="true" />
-                <p className="max-w-xs text-sm text-muted-foreground">{error}</p>
-              </>
-            ) : status === 'loading' ? (
-              <>
-                <Loader2 className="size-10 animate-spin text-primary" aria-hidden="true" />
-                <p className="text-sm text-muted-foreground">Loading hand-tracking model...</p>
-              </>
-            ) : (
-              <>
-                <div className="flex size-16 items-center justify-center rounded-full bg-muted">
-                  <Camera className="size-7 text-muted-foreground" aria-hidden="true" />
-                </div>
-                <p className="text-sm font-medium">Camera is off</p>
-                <p className="max-w-xs text-xs leading-relaxed text-muted-foreground">
-                  Start the camera to translate sign language in real time with hand-skeleton
+      {/* Idle / loading / error states */}
+      {!running && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 text-center">
+          {status === 'loading' ? (
+            <>
+              <div className="flex size-16 items-center justify-center rounded-full bg-white/10">
+                <Loader2 className="size-7 animate-spin text-stage-foreground" aria-hidden="true" />
+              </div>
+              <p className="text-sm text-stage-foreground/70">Loading hand-tracking model...</p>
+            </>
+          ) : status === 'error' ? (
+            <>
+              <div className="flex size-16 items-center justify-center rounded-full bg-white/10">
+                <CameraOff className="size-7 text-primary" aria-hidden="true" />
+              </div>
+              <p className="max-w-xs text-sm leading-relaxed text-stage-foreground/70">{error}</p>
+              <button
+                type="button"
+                onClick={() => onActiveChange(true)}
+                className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.03] active:scale-[0.98]"
+              >
+                Try again
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex size-16 items-center justify-center rounded-full bg-white/10">
+                <Video className="size-7 text-stage-foreground/60" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-stage-foreground">Camera is off</p>
+                <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-stage-foreground/60">
+                  Start the camera to interpret sign language in real time with on-device hand
                   tracking.
                 </p>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onActiveChange(true)}
+                className="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:scale-[1.03] active:scale-[0.98]"
+              >
+                <Camera className="size-4" aria-hidden="true" />
+                Start camera
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </section>
   )
 }
