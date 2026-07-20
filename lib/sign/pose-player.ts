@@ -23,8 +23,13 @@ interface TimelineFrame {
 // offsets are measured from. Tuned for the avatar in avatar units.
 const ANCHOR_R: [number, number, number] = [0.14, 0.98, 0.16]
 const ANCHOR_L: [number, number, number] = [-0.14, 0.98, 0.16]
-const REST_R: [number, number, number] = [0.24, 0.66, 0.12]
-const REST_L: [number, number, number] = [-0.24, 0.66, 0.12]
+// Idle rest: hands hang down and BACK beside the hips, roughly beneath the
+// shoulders, instead of reaching forward. The signing anchors push hands
+// forward of the chest (positive z) so they read in front of the body, but a
+// relaxed rest pose needs the opposite — a low, slightly-behind target so the
+// arms drape naturally at the sides with a soft elbow bend.
+const REST_R: [number, number, number] = [0.23, 0.52, -0.34]
+const REST_L: [number, number, number] = [-0.23, 0.52, -0.34]
 
 function add(a: [number, number, number], b: [number, number, number]): [number, number, number] {
   return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
