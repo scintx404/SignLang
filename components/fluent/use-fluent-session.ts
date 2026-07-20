@@ -1,6 +1,5 @@
 "use client"
 
-// pose-player constants updated — bust Turbopack module cache
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PosePlayer } from "@/lib/sign/pose-player"
 import { buildSignSequence, KNOWN_WORDS, type SignToken } from "@/lib/sign"

@@ -47,12 +47,7 @@ function restHand(side: "right" | "left"): HandRuntime {
   return { pos: side === "right" ? REST_R : REST_L, shape: REST_SHAPE }
 }
 
-let _idleLogCount = 0
 function idlePose(): Pose {
-  if (_idleLogCount < 3) {
-    console.log("[v0] idlePose REST_R", REST_R, "REST_L", REST_L)
-    _idleLogCount++
-  }
   return { right: restHand("right"), left: restHand("left") }
 }
 
