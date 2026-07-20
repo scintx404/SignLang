@@ -260,12 +260,7 @@ export function FBXSigner({
     // the same offsets now land just in front of THIS model's chest.
     const chestFrontZ = box.max.z
     zShiftRef.current = chestFrontZ + FORWARD_MARGIN - OLD_ANCHOR_Z * SIZE
-    console.log(
-      "[v0] fbx rig: scale=", scale.toFixed(4),
-      "box=", JSON.stringify({ min: box.min.toArray().map((n) => +n.toFixed(2)), max: box.max.toArray().map((n) => +n.toFixed(2)) }),
-      "chestFrontZ=", chestFrontZ.toFixed(3),
-      "zShift=", zShiftRef.current.toFixed(3),
-    )
+
 
     const rigs: ArmRig[] = []
     for (const arm of ARMS) {
@@ -304,14 +299,7 @@ export function FBXSigner({
       })
     }
     arms.current = rigs
-    for (const r of rigs) {
-      console.log(
-        "[v0] arm", r.poseKey,
-        "shoulderWorld=", r.shoulderWorld.toArray().map((n) => +n.toFixed(3)),
-        "upperLen=", r.upperLen.toFixed(3),
-        "foreLen=", r.foreLen.toFixed(3),
-      )
-    }
+
   }, [model])
 
   useFrame((_, delta) => {

@@ -24,7 +24,7 @@ class ModelBoundary extends Component<{ fallback: ReactNode; children: ReactNode
   }
 
   componentDidCatch(error: unknown) {
-    console.log("[v0] Rigged model failed to load, using procedural fallback:", error)
+    console.error("Rigged model failed to load, using procedural fallback:", error)
   }
 
   render() {
