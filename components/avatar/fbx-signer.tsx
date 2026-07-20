@@ -46,12 +46,18 @@ const FINGER_BONE: Record<FingerName, string> = {
   pinky: "Pinky",
 }
 
-// Curl tuning. Fingers bend about their local +X axis; a negative angle rolls
-// the fingertips toward the palm for this rig.
-const CURL_SIGN = -1
+// Curl tuning. Introspecting the rig shows each finger bone's child extends
+// along local +Y, while the flexion hinge (the medial-lateral axis running
+// ACROSS the fingers) is local +Z — NOT local +X, which points along world
+// vertical and was previously swinging the fingers sideways instead of
+// curling them. Rotating about local +Z folds the fingertips toward the palm.
+const CURL_SIGN = 1
 const FINGER_GAIN = [0.9, 1.15, 1.0] // proximal, middle, distal phalanx
 const THUMB_GAIN = [0.55, 0.85, 0.7]
-const BEND_AXIS = new THREE.Vector3(1, 0, 0)
+const BEND_AXIS = new THREE.Vector3(0, 0, 1)
+// The thumb's local frame is rotated ~45° off the other fingers, so it flexes
+// about a blended axis rather than pure +Z.
+const THUMB_BEND_AXIS = new THREE.Vector3(0, 0.35, 1).normalize()
 const CHILD_AXIS = new THREE.Vector3(0, 1, 0) // every bone's child is along +Y
 
 // The old procedural avatar placed its shoulder line at local Y = 1.4 inside
@@ -156,11 +162,13 @@ function applyFingers(rig: ArmRig, shape: HandShape) {
     const chain = rig.fingers[finger]
     if (!chain || !chain.length) continue
     const curl = shape.curl[finger] ?? 0
-    const gain = finger === "thumb" ? THUMB_GAIN : FINGER_GAIN
+    const isThumb = finger === "thumb"
+    const gain = isThumb ? THUMB_GAIN : FINGER_GAIN
+    const axis = isThumb ? THUMB_BEND_AXIS : BEND_AXIS
     for (let i = 0; i < chain.length; i++) {
       const { bone, rest } = chain[i]
       const angle = CURL_SIGN * curl * (gain[i] ?? 1)
-      _curlQ.setFromAxisAngle(BEND_AXIS, angle)
+      _curlQ.setFromAxisAngle(axis, angle)
       _outQ.copy(rest).multiply(_curlQ)
       bone.quaternion.copy(_outQ)
     }
