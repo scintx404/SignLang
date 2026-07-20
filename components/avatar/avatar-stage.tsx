@@ -2,17 +2,11 @@
 
 import { Suspense, useEffect, useRef, useState } from "react"
 import { Canvas } from "@react-three/fiber"
-import { Environment, OrbitControls, ContactShadows } from "@react-three/drei"
+import { OrbitControls, ContactShadows } from "@react-three/drei"
 import * as THREE from "three"
 import { SignerAvatar } from "./signer-avatar"
 import { GLBSigner } from "./glb-signer"
 import { PosePlayer } from "@/lib/sign/pose-player"
-import type { SignStep } from "@/lib/sign/types"
-
-export interface AvatarStageHandle {
-  play: (steps: SignStep[]) => void
-  stop: () => void
-}
 
 function ModelWithFallback({
   playerRef,
@@ -62,8 +56,8 @@ export function AvatarStage({
       camera={{ position: [0, 1.35, 1.35], fov: 34 }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
     >
-      <color attach="background" args={["#f2ece1"]} />
-      <fog attach="fog" args={["#f2ece1", 3.5, 7]} />
+      <color attach="background" args={["#26232f"]} />
+      <fog attach="fog" args={["#26232f", 3.5, 7]} />
       <ambientLight intensity={0.7} />
       <directionalLight
         position={[2, 4, 3]}
@@ -73,6 +67,8 @@ export function AvatarStage({
         shadow-bias={-0.0002}
       />
       <directionalLight position={[-3, 2, -2]} intensity={0.4} color="#ffd9b0" />
+      <hemisphereLight args={["#fff6ea", "#8a7a63", 0.6]} />
+      <pointLight position={[0, 2, 2]} intensity={0.5} color="#fff2e0" />
 
       <group position={[0, -1.0, 0]}>
         <Suspense fallback={null}>
@@ -96,7 +92,6 @@ export function AvatarStage({
         />
       </group>
 
-      <Environment preset="apartment" />
       <OrbitControls
         enablePan={false}
         minDistance={0.9}

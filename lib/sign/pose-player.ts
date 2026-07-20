@@ -89,6 +89,9 @@ export class PosePlayer {
   private displayed: Pose = clonePose(IDLE_POSE)
   private lastToken = -1
 
+  /** Playback rate multiplier. 1 = normal, <1 slower, >1 faster. */
+  speed = 1
+
   onToken?: (tokenIndex: number) => void
   onProgress?: (label: string, index: number, total: number) => void
   onDone?: () => void
@@ -153,7 +156,7 @@ export class PosePlayer {
         if (token) this.onProgress?.(token.label, frame.tokenIndex, this.tokens.length)
       }
 
-      this.elapsed += dt * 1000
+      this.elapsed += dt * 1000 * this.speed
       if (this.elapsed >= frame.hold) {
         this.elapsed = 0
         this.idx++
